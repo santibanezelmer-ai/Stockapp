@@ -4166,7 +4166,13 @@ document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.bottom-nav .nav-btn').forEach(function(btn){
     btn.addEventListener('click', function(){
       if (btn.id === 'moreMenuBtn') { openMoreDrawer(); return; }
-      showSection(btn.dataset.section);
+      if (btn.dataset.section) showSection(btn.dataset.section);
+    });
+  });
+  // Sidebar nav buttons — ALSO bind directly as backup
+  document.querySelectorAll('.sidebar .nav-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      if (btn.dataset.section) showSection(btn.dataset.section);
     });
   });
 
@@ -4308,10 +4314,12 @@ document.addEventListener('DOMContentLoaded', function() {
     desktopToggle.checked = localStorage.getItem('stockapp_layout') === 'desktop';
     desktopToggle.addEventListener('change', function(){
       var mode = this.checked ? 'desktop' : 'mobile';
-      localStorage.setItem('stockapp_layout', mode);
-      toast((mode==='desktop'?'Modo escritorio':'Modo movil')+' activado — recargando...', 'success', 1500);
-      // Reload after short delay so toast is visible
-      setTimeout(function(){ window.location.reload(); }, 1000);
+      applyLayout(mode);
+      toast((mode==='desktop'?'Modo escritorio':'Modo movil')+' activado', 'success');
+      // Reload current section after layout settles
+      setTimeout(function(){
+        if (state.currentSection) showSection(state.currentSection);
+      }, 200);
     });
   }
 
@@ -4365,6 +4373,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Event delegation for dynamic elements
   document.addEventListener('click', function(e) {
+    // Sidebar nav buttons (desktop mode) — event delegation
+    var sideBtn = e.target.closest('.sidebar .nav-btn');
+    if (sideBtn && sideBtn.dataset.section) {
+      showSection(sideBtn.dataset.section);
+      return;
+    }
     // Cart qty
     var qb = e.target.closest('.qty-btn');
     if(qb){ changeQty(parseInt(qb.dataset.idx), parseInt(qb.dataset.delta)); return; }
