@@ -714,96 +714,170 @@ body.desktop-mode .toast-container { bottom: 20px; }
 body.desktop-mode .modal-content { border-radius: var(--r-xl); max-width: 520px; margin: 0 auto; }
 body.desktop-mode .modal { align-items: center; }
 
+
+/* ══════════════════════════════
+   SETTINGS ADDITIONS
+══════════════════════════════ */
+.settings-logo-row { display:flex; align-items:flex-start; gap:14px; margin-bottom:16px; }
+.logo-preview { width:72px; height:72px; border-radius:var(--r-lg); background:var(--bg3); border:2px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:32px; flex-shrink:0; overflow:hidden; }
+.color-preset { width:32px; height:32px; border-radius:50%; border:2px solid transparent; cursor:pointer; transition:all 0.15s; }
+.color-preset:hover, .color-preset:active { transform:scale(1.15); border-color:white; }
+.payment-toggles { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.payment-toggle-item { display:flex; align-items:center; gap:8px; padding:11px 12px; background:var(--bg2); border-radius:var(--r); font-size:14px; font-weight:500; cursor:pointer; }
+.payment-toggle-item input { width:18px; height:18px; accent-color:var(--accent); }
+.permisos-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.permiso-item { display:flex; align-items:center; gap:8px; padding:10px 12px; background:var(--bg2); border-radius:var(--r); font-size:13px; font-weight:500; cursor:pointer; }
+.permiso-item input { width:16px; height:16px; accent-color:var(--accent); }
+
+/* ── USER CARD in list ── */
+.user-item { display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--border); }
+.user-item:last-child { border-bottom:none; }
+.user-item-left { display:flex; align-items:center; gap:12px; }
+.user-avatar-sm { width:38px; height:38px; border-radius:50%; background:var(--accent-glow); border:1.5px solid var(--accent); color:var(--accent2); font-weight:800; font-size:16px; display:flex; align-items:center; justify-content:center; }
+.user-name { font-size:14px; font-weight:700; }
+.user-role { font-size:12px; color:var(--text2); }
+.user-perms { display:flex; gap:4px; margin-top:4px; flex-wrap:wrap; }
+.perm-tag { font-size:10px; padding:2px 7px; border-radius:100px; background:var(--surface2); color:var(--text3); font-weight:600; }
+
+/* ══════════════════════════════
+   CATALOG PAGE
+══════════════════════════════ */
+#orderScreen { background:var(--bg); display:flex; flex-direction:column; overflow:hidden; }
+.catalog-header { background:var(--bg2); border-bottom:1px solid var(--border); padding:16px 14px 0; flex-shrink:0; position:sticky; top:0; z-index:50; }
+.catalog-brand { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+.cat-logo { width:44px; height:44px; border-radius:var(--r); background:var(--surface); display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0; overflow:hidden; border:1px solid var(--border); }
+.cat-logo img { width:100%; height:100%; object-fit:contain; }
+.cat-biz-name { font-family:var(--font); font-size:18px; font-weight:800; }
+.cat-biz-sub { font-size:12px; color:var(--text2); }
+.cat-search-input { width:100%; padding:10px 16px; background:var(--surface); border:1.5px solid var(--border); border-radius:100px; color:var(--text); font-family:var(--font2); font-size:14px; outline:none; transition:border-color 0.2s; margin-bottom:12px; }
+.cat-search-input:focus { border-color:var(--accent); }
+.cat-filter-wrap { display:flex; gap:8px; overflow-x:auto; padding-bottom:12px; scrollbar-width:none; }
+.cat-filter-wrap::-webkit-scrollbar { display:none; }
+.cat-pill { padding:7px 16px; border-radius:100px; border:1.5px solid var(--border); background:var(--surface); color:var(--text2); font-size:13px; font-weight:600; white-space:nowrap; cursor:pointer; transition:all 0.15s; flex-shrink:0; }
+.cat-pill.active { background:var(--accent); border-color:var(--accent); color:white; }
+
+.catalog-body { flex:1; overflow-y:auto; padding:16px 14px 120px; overscroll-behavior:contain; }
+.cat-section-title { font-size:12px; font-weight:700; color:var(--text2); text-transform:uppercase; letter-spacing:0.8px; margin:18px 0 10px; }
+.cat-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:4px; }
+.cat-card { background:var(--surface); border:1.5px solid var(--border); border-radius:var(--r-lg); overflow:hidden; cursor:pointer; transition:all 0.18s; position:relative; }
+.cat-card:active { transform:scale(0.97); border-color:var(--accent); }
+.cat-card-img { height:120px; background:var(--bg3); display:flex; align-items:center; justify-content:center; font-size:48px; overflow:hidden; }
+.cat-card-img img { width:100%; height:100%; object-fit:cover; }
+.cat-card-body { padding:10px; }
+.cat-card-name { font-size:13px; font-weight:700; line-height:1.3; margin-bottom:4px; }
+.cat-card-price { font-family:var(--font); font-size:17px; font-weight:800; color:var(--green); }
+.cat-card-stock { font-size:11px; color:var(--text3); margin-top:2px; }
+.cat-card-add { position:absolute; top:8px; right:8px; width:32px; height:32px; border-radius:50%; background:var(--accent); color:white; border:none; font-size:20px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 10px var(--accent-glow); cursor:pointer; transition:transform 0.15s; }
+.cat-card-add:active { transform:scale(0.9); }
+.cat-card-in-cart { position:absolute; top:8px; left:8px; background:var(--green); color:white; border-radius:100px; padding:3px 8px; font-size:11px; font-weight:800; }
+
+/* Cart FAB */
+.cart-fab { position:fixed; bottom:20px; left:14px; right:14px; background:linear-gradient(135deg, var(--accent), #5B52EE); border-radius:var(--r-xl); padding:14px 18px; display:flex; align-items:center; gap:12px; color:white; box-shadow:0 8px 28px var(--accent-glow); z-index:100; animation:fabIn 0.3s cubic-bezier(.32,.72,0,1); }
+@keyframes fabIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:none; } }
+.cart-fab-info { display:flex; flex-direction:column; }
+.cart-fab-count { font-family:var(--font); font-size:20px; font-weight:800; line-height:1; }
+.cart-fab-label { font-size:11px; opacity:0.8; }
+.cart-fab-total { font-family:var(--font); font-size:18px; font-weight:800; flex:1; text-align:center; }
+.cart-fab-btn { background:rgba(255,255,255,0.2); border:none; color:white; padding:10px 16px; border-radius:var(--r); font-weight:700; font-size:14px; cursor:pointer; white-space:nowrap; }
+
+/* Bottom Sheet */
+.bottom-sheet { position:fixed; inset:0; z-index:200; display:flex; align-items:flex-end; }
+.bottom-sheet.hidden { display:none !important; }
+.bottom-sheet-overlay { position:absolute; inset:0; background:rgba(0,0,0,0.65); backdrop-filter:blur(4px); }
+.bottom-sheet-content { position:relative; width:100%; background:var(--bg2); border-radius:var(--r-2xl) var(--r-2xl) 0 0; border-top:1px solid var(--border2); max-height:92vh; display:flex; flex-direction:column; animation:slideUp 0.25s cubic-bezier(.32,.72,0,1); }
+.bottom-sheet-handle { width:36px; height:4px; background:var(--border2); border-radius:2px; margin:10px auto 0; flex-shrink:0; }
+.bottom-sheet-header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.bottom-sheet-header h3 { font-family:var(--font); font-size:17px; font-weight:800; }
+.bottom-sheet-close { width:30px; height:30px; border-radius:50%; background:var(--surface2); border:none; color:var(--text2); font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.bottom-sheet-body { overflow-y:auto; padding:16px 18px 32px; flex:1; }
+.cart-sheet-totals { background:var(--surface); border-radius:var(--r); padding:14px; margin:14px 0; }
+.cart-total-row { display:flex; justify-content:space-between; font-size:16px; }
+.cart-total-row strong { font-family:var(--font); font-size:22px; font-weight:800; color:var(--green); }
+.cart-item-row { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); }
+.cart-item-row:last-child { border-bottom:none; }
+.cart-item-img-sm { width:44px; height:44px; border-radius:var(--r-sm); background:var(--bg3); display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; overflow:hidden; }
+.cart-item-img-sm img { width:100%; height:100%; object-fit:cover; }
+.cart-item-info-col { flex:1; min-width:0; }
+.cart-item-name-sm { font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cart-item-price-sm { font-size:12px; color:var(--text2); }
+.cart-item-qty-ctrl { display:flex; align-items:center; gap:6px; }
+.qty-btn-sm { width:28px; height:28px; border-radius:var(--r-sm); border:1.5px solid var(--border2); background:var(--bg2); color:var(--text); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.qty-btn-sm:active { background:var(--accent); border-color:var(--accent); color:white; }
+.cat-loading { text-align:center; padding:60px 20px; color:var(--text2); }
+.cat-spinner { width:40px; height:40px; border:3px solid var(--border2); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; margin:0 auto 16px; }
+.cat-empty { text-align:center; padding:40px 20px; color:var(--text3); }
+.cat-empty-icon { font-size:48px; margin-bottom:12px; }
+
 </style>
 </head>
 <body>
 
 <!-- LOGIN -->
-<!-- ORDER PAGE (public) -->
+<!-- CATALOG PAGE (public) -->
 <div id="orderScreen" class="screen hidden">
-  <div class="order-header">
-    <div class="order-logo">
-      <span class="order-logo-icon">📦</span>
+  <!-- Header -->
+  <div class="catalog-header">
+    <div class="catalog-brand">
+      <div id="catLogoWrap" class="cat-logo">📦</div>
       <div>
-        <div class="order-biz-name" id="orderBizName">Cargando...</div>
-        <div class="order-biz-sub">Catálogo de productos</div>
+        <div class="cat-biz-name" id="orderBizName">Cargando...</div>
+        <div class="cat-biz-sub" id="orderBizSub">Catálogo de productos</div>
       </div>
     </div>
-  </div>
-  <div class="order-body">
-    <div class="search-bar" style="margin-bottom:14px">
-      <input type="text" id="orderSearch" placeholder="🔍 Buscar producto...">
+    <div class="cat-search-wrap">
+      <input type="text" id="catSearch" placeholder="🔍 Buscar producto..." class="cat-search-input">
     </div>
-    <div id="orderProductsGrid" class="products-grid"></div>
+    <div class="cat-filter-wrap" id="catCategories"></div>
   </div>
-  <!-- Order Cart FAB -->
-  <div id="orderCartFab" class="order-cart-fab hidden">
-    <span id="orderCartCount">0</span> productos · <strong id="orderCartTotal">$0</strong>
-    <button id="orderCheckoutBtn">Ver pedido →</button>
-  </div>
-  <!-- Checkout Sheet -->
-  <div id="orderCheckout" class="order-checkout hidden">
-    <div class="modal-overlay" id="orderCheckoutOverlay"></div>
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>Tu Pedido</h3>
-        <button class="modal-close" id="closeOrderCheckout">✕</button>
-      </div>
-      <div class="modal-body">
-        <div id="orderCartItems" style="margin-bottom:16px"></div>
-        <div class="total-row total-final" style="margin-bottom:16px">
-          <span>Total estimado:</span><span id="orderTotalDisplay">$0</span>
-        </div>
-        <div class="form-group"><label>Tu nombre *</label><input type="text" id="orderClientName" placeholder="Juan Pérez"></div>
-        <div class="form-group"><label>Tu teléfono *</label><input type="tel" id="orderClientPhone" placeholder="+56 9..."></div>
-        <div class="form-group"><label>Notas (opcional)</label><textarea id="orderNotes" rows="2" placeholder="Dirección, horario..."></textarea></div>
-        <button id="sendOrderWhatsApp" class="btn btn-whatsapp btn-lg" style="margin-top:8px">📲 Enviar pedido por WhatsApp</button>
-      </div>
+
+  <!-- Products -->
+  <div class="catalog-body" id="catalogBody">
+    <div class="cat-loading">
+      <div class="cat-spinner"></div>
+      <p>Cargando catálogo...</p>
     </div>
+  </div>
+
+  <!-- Cart FAB -->
+  <div id="cartFab" class="cart-fab hidden">
+    <div class="cart-fab-info">
+      <span class="cart-fab-count" id="fabCount">0</span>
+      <span class="cart-fab-label">productos</span>
+    </div>
+    <div class="cart-fab-total" id="fabTotal">$0</div>
+    <button id="openCartBtn" class="cart-fab-btn">Ver pedido →</button>
   </div>
 </div>
 
-<!-- REGISTRO -->
-<div id="registerScreen" class="screen hidden" style="align-items:flex-start;justify-content:center;padding:40px 24px;overflow-y:auto;background:var(--bg)">
-  <div class="login-bg"></div>
-  <div class="login-container" style="position:relative;z-index:1;width:100%;max-width:400px">
-    <div class="login-logo">
-      <div class="logo-icon">📦</div>
-      <h1>StockApp</h1>
-      <p>Crea tu tienda gratis</p>
+<!-- CART SHEET -->
+<div id="cartSheet" class="bottom-sheet hidden">
+  <div class="bottom-sheet-overlay" id="cartSheetOverlay"></div>
+  <div class="bottom-sheet-content">
+    <div class="bottom-sheet-handle"></div>
+    <div class="bottom-sheet-header">
+      <h3>🛒 Tu Pedido</h3>
+      <button class="bottom-sheet-close" id="closeCartSheet">✕</button>
     </div>
-    <div class="login-form card">
-      <h2>Nuevo negocio</h2>
-      <div class="form-group">
-        <label>Nombre del negocio *</label>
-        <input type="text" id="regBusiness" placeholder="Ej: Minimarket Ana">
+    <div class="bottom-sheet-body">
+      <div id="cartSheetItems"></div>
+      <div id="cartSheetTotals" class="cart-sheet-totals">
+        <div class="cart-total-row"><span>Total estimado:</span><strong id="cartSheetTotal">$0</strong></div>
       </div>
-      <div class="form-group">
-        <label>Tu nombre *</label>
-        <input type="text" id="regName" placeholder="Ana González">
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+        <div class="form-group"><label>Tu nombre *</label><input type="text" id="orderName" placeholder="Juan Pérez"></div>
+        <div class="form-group"><label>Tu teléfono *</label><input type="tel" id="orderPhone" placeholder="+56 9..."></div>
+        <div class="form-group"><label>Notas (dirección, horario...)</label><textarea id="orderNotes" rows="2" placeholder="Opcional"></textarea></div>
       </div>
-      <div class="form-group">
-        <label>Email *</label>
-        <input type="email" id="regEmail" placeholder="ana@correo.com">
-      </div>
-      <div class="form-group">
-        <label>Contraseña *</label>
-        <div class="input-icon-wrap">
-          <input type="password" id="regPass" placeholder="Mínimo 6 caracteres">
-        </div>
-      </div>
-      <div id="regError" class="error-msg hidden"></div>
-      <button id="regBtn" class="btn btn-primary btn-lg">
-        <span id="regBtnText">Crear mi tienda gratis</span>
-        <span id="regSpinner" class="spinner hidden"></span>
+      <button id="sendOrderBtn" class="btn btn-whatsapp btn-lg" style="margin-top:4px">
+        📲 Enviar pedido por WhatsApp
       </button>
-      <p class="login-hint" style="margin-top:16px">
-        ¿Ya tienes cuenta?
-        <span id="goToLogin" style="color:var(--accent2);cursor:pointer;font-weight:700"> Inicia sesión</span>
+      <p style="text-align:center;font-size:12px;color:var(--text3);margin-top:10px">
+        Tu pedido se enviará directamente al negocio
       </p>
     </div>
   </div>
 </div>
+
 
 <div id="loginScreen" class="screen active">
   <div class="login-bg"></div>
@@ -1129,13 +1203,86 @@ body.desktop-mode .modal { align-items: center; }
         <section id="sec-settings" class="section hidden">
       <div class="section-header"><h2>Configuración</h2></div>
 
-      <!-- Negocio -->
+      <!-- Identidad del negocio -->
       <div class="card">
         <h3>🏪 Mi Negocio</h3>
+        <div class="settings-logo-row">
+          <div id="logoPreview" class="logo-preview">
+            <img id="topLogoImg" style="display:none;width:100%;height:100%;object-fit:contain;border-radius:8px">
+            <span id="logoPlaceholder">📦</span>
+          </div>
+          <div style="flex:1">
+            <div class="form-group" style="margin-bottom:8px"><label>URL del logo</label><input type="url" id="settingLogoUrl" placeholder="https://... (imagen)"></div>
+            <button id="applyLogoBtn" class="btn btn-outline btn-sm">Aplicar logo</button>
+          </div>
+        </div>
         <div class="form-group"><label>Nombre del negocio</label><input type="text" id="settingBusinessName" placeholder="Ej: Minimarket Ana"></div>
+        <div class="form-row">
+          <div class="form-group"><label>RUT / ID Fiscal</label><input type="text" id="settingRut" placeholder="12.345.678-9"></div>
+          <div class="form-group"><label>Razón Social</label><input type="text" id="settingRazonSocial" placeholder="Ana González SpA"></div>
+        </div>
         <div class="form-group"><label>Dirección</label><input type="text" id="settingAddress" placeholder="Calle 123, Ciudad"></div>
         <div class="form-group"><label>Teléfono / WhatsApp</label><input type="tel" id="settingPhone" placeholder="+56 9 1234 5678"></div>
         <button id="saveSettingsBtn" class="btn btn-primary btn-lg">💾 Guardar cambios</button>
+      </div>
+
+      <!-- Apariencia -->
+      <div class="card">
+        <h3>🎨 Apariencia</h3>
+        <div class="form-group">
+          <label>Color principal</label>
+          <div style="display:flex;gap:10px;align-items:center">
+            <input type="color" id="settingColor" value="#6C63FF" style="width:52px;height:44px;padding:2px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);cursor:pointer">
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:600" id="colorPreviewLabel">#6C63FF</div>
+              <div style="font-size:12px;color:var(--text2)">Define el color de botones y elementos activos</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+            <button class="color-preset" data-color="#6C63FF" style="background:#6C63FF">⬤</button>
+            <button class="color-preset" data-color="#10D97E" style="background:#10D97E">⬤</button>
+            <button class="color-preset" data-color="#FF5271" style="background:#FF5271">⬤</button>
+            <button class="color-preset" data-color="#FFB830" style="background:#FFB830">⬤</button>
+            <button class="color-preset" data-color="#38BFFF" style="background:#38BFFF">⬤</button>
+            <button class="color-preset" data-color="#FF6B35" style="background:#FF6B35">⬤</button>
+            <button class="color-preset" data-color="#C850C0" style="background:#C850C0">⬤</button>
+          </div>
+        </div>
+        <button id="saveAppearanceBtn" class="btn btn-primary btn-lg">💾 Guardar apariencia</button>
+      </div>
+
+      <!-- Configuración financiera -->
+      <div class="card">
+        <h3>💰 Precios e Impuestos</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Moneda</label>
+            <select id="settingMoneda">
+              <option value="CLP">🇨🇱 Peso Chileno (CLP)</option>
+              <option value="USD">🇺🇸 Dólar (USD)</option>
+              <option value="EUR">🇪🇺 Euro (EUR)</option>
+              <option value="PEN">🇵🇪 Sol (PEN)</option>
+              <option value="ARS">🇦🇷 Peso Argentino (ARS)</option>
+              <option value="MXN">🇲🇽 Peso Mexicano (MXN)</option>
+              <option value="COP">🇨🇴 Peso Colombiano (COP)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Impuesto (%)</label>
+            <input type="number" id="settingImpuesto" placeholder="0" min="0" max="100" step="0.1">
+            <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = sin impuesto · 19 = IVA Chile</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Métodos de pago habilitados</label>
+          <div class="payment-toggles">
+            <label class="payment-toggle-item"><input type="checkbox" id="pm_efectivo" value="efectivo" checked> 💵 Efectivo</label>
+            <label class="payment-toggle-item"><input type="checkbox" id="pm_transferencia" value="transferencia" checked> 📱 Transferencia</label>
+            <label class="payment-toggle-item"><input type="checkbox" id="pm_tarjeta" value="tarjeta" checked> 💳 Tarjeta</label>
+            <label class="payment-toggle-item"><input type="checkbox" id="pm_fiado" value="fiado"> 📒 Fiado</label>
+          </div>
+        </div>
+        <button id="saveFinanceBtn" class="btn btn-primary btn-lg">💾 Guardar configuración</button>
       </div>
 
       <!-- Vista -->
@@ -1152,31 +1299,26 @@ body.desktop-mode .modal { align-items: center; }
             <span class="toggle-slider"></span>
           </label>
         </div>
-        <input type="hidden" id="layoutSelector" value="mobile">
       </div>
 
       <!-- Catálogo -->
       <div class="card">
         <h3>🔗 Link del Catálogo</h3>
-        <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Comparte este link para que tus clientes vean tu catálogo y te hagan pedidos por WhatsApp.</p>
-        <button id="showQRBtn" class="btn btn-primary btn-lg">🔗 Ver mi link de catálogo</button>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Comparte tu catálogo público para recibir pedidos por WhatsApp.</p>
+        <button id="showQRBtn" class="btn btn-primary btn-lg">🔗 Ver mi link</button>
       </div>
 
       <!-- Meta -->
       <div class="card">
         <h3>🎯 Meta Diaria</h3>
-        <div class="form-group">
-          <label>Meta de ventas del día</label>
-          <input type="number" id="dailyGoalInput" placeholder="Ej: 100000" min="0">
-        </div>
+        <div class="form-group"><label>Meta de ventas del día</label><input type="number" id="dailyGoalInput" placeholder="Ej: 100000" min="0"></div>
         <button id="saveDailyGoalBtn" class="btn btn-primary btn-lg">💾 Guardar meta</button>
       </div>
 
-      <!-- Alertas stock -->
+      <!-- Alertas -->
       <div class="card">
         <h3>🔔 Alertas de Stock</h3>
-        <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Recibe un WhatsApp cuando un producto llegue a stock mínimo.</p>
-        <div class="form-group"><label>Número WhatsApp (con código país)</label><input type="tel" id="settingAlertPhone" placeholder="+56 9 1234 5678"></div>
+        <div class="form-group"><label>Número WhatsApp para alertas</label><input type="tel" id="settingAlertPhone" placeholder="+56 9 1234 5678"></div>
         <div style="display:flex;gap:10px">
           <button id="saveAlertPhoneBtn" class="btn btn-primary" style="flex:1">💾 Guardar</button>
           <button id="testAlertBtn" class="btn btn-outline" style="flex:1">📲 Probar</button>
@@ -1189,17 +1331,32 @@ body.desktop-mode .modal { align-items: center; }
         <div id="usersList"></div>
         <button id="showUserFormBtn" class="btn btn-outline btn-lg" style="margin-top:12px">+ Agregar usuario</button>
         <div id="userFormCard" class="hidden" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
-          <div class="form-group"><label>Nombre</label><input type="text" id="newUserName" placeholder="Juan Pérez"></div>
-          <div class="form-group"><label>Usuario</label><input type="text" id="newUserLogin" placeholder="juanperez"></div>
-          <div class="form-group"><label>Contraseña</label><input type="password" id="newUserPass" placeholder="Contraseña"></div>
-          <div class="form-group"><label>Rol</label>
-            <select id="newUserRole">
-              <option value="admin">Administrador</option>
-              <option value="vendedor">Vendedor</option>
-            </select>
+          <div class="form-row">
+            <div class="form-group"><label>Nombre</label><input type="text" id="newUserName" placeholder="Juan Pérez"></div>
+            <div class="form-group"><label>Usuario / Email</label><input type="text" id="newUserLogin" placeholder="juan@..."></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Contraseña</label><input type="password" id="newUserPass" placeholder="Contraseña"></div>
+            <div class="form-group"><label>Rol</label>
+              <select id="newUserRole">
+                <option value="admin">Administrador</option>
+                <option value="vendedor" selected>Vendedor</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Permisos específicos</label>
+            <div class="permisos-grid">
+              <label class="permiso-item"><input type="checkbox" id="perm_ver_costos"> Ver precios de costo</label>
+              <label class="permiso-item"><input type="checkbox" id="perm_ver_reportes"> Ver reportes</label>
+              <label class="permiso-item"><input type="checkbox" id="perm_ver_config"> Ver configuración</label>
+              <label class="permiso-item"><input type="checkbox" id="perm_descuentos" checked> Hacer descuentos</label>
+              <label class="permiso-item"><input type="checkbox" id="perm_anular"> Anular ventas</label>
+              <label class="permiso-item"><input type="checkbox" id="perm_productos"> Agregar productos</label>
+            </div>
           </div>
           <div class="form-actions">
-            <button id="saveUserBtn" class="btn btn-primary">Guardar</button>
+            <button id="saveUserBtn" class="btn btn-primary">Guardar usuario</button>
             <button id="cancelUserBtn" class="btn btn-outline">Cancelar</button>
           </div>
         </div>
@@ -1208,17 +1365,14 @@ body.desktop-mode .modal { align-items: center; }
       <!-- Respaldo -->
       <div class="card">
         <h3>💾 Respaldo</h3>
-        <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Crea una copia de seguridad de todos tus datos en Google Sheets.</p>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Crea una copia de seguridad de todos tus datos.</p>
         <button id="createBackupBtn" class="btn btn-outline btn-lg">💾 Crear respaldo ahora</button>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
           <div>
             <div style="font-size:14px;font-weight:700">Respaldo automático</div>
-            <div style="font-size:12px;color:var(--text2)">Se respalda una vez al día al abrir la app</div>
+            <div style="font-size:12px;color:var(--text2)">Una vez al día al abrir la app</div>
           </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="autoBackupToggle">
-            <span class="toggle-slider"></span>
-          </label>
+          <label class="toggle-switch"><input type="checkbox" id="autoBackupToggle"><span class="toggle-slider"></span></label>
         </div>
         <div id="backupStatus" class="status-msg hidden"></div>
       </div>
@@ -1408,23 +1562,40 @@ function can(action) {
   return myPerms.indexOf(action) >= 0;
 }
 function applyRoleUI() {
-  if (!can('view_costs')) {
+  var u = state.currentUser;
+  if (!u) return;
+  var isAdmin = u.role === 'admin';
+  var p = u.permisos || {};
+
+  // Costs
+  if (!isAdmin && !p.ver_costos) {
     document.querySelectorAll('.cost-price-field').forEach(function(e){ e.style.display='none'; });
-    // Hide restricted sections in BOTH sidebar and bottom nav
-    ['reports','purchases'].forEach(function(sec){
-      document.querySelectorAll('[data-section="'+sec+'"]').forEach(function(e){ e.style.display='none'; });
-    });
-    // Hide section labels if all items hidden
-    document.querySelectorAll('.sidebar-section-label').forEach(function(label){
-      var next = label.nextElementSibling;
-      var allHidden = true;
-      while(next && !next.classList.contains('sidebar-section-label')) {
-        if (next.style.display !== 'none') { allHidden = false; break; }
-        next = next.nextElementSibling;
-      }
-      if (allHidden) label.style.display = 'none';
-    });
+    // Hide cost price fields in product form
+    var costField = document.getElementById('productCostPrice');
+    if (costField) costField.closest('.form-group') && (costField.closest('.form-group').style.display='none');
   }
+  // Reports
+  if (!isAdmin && !p.ver_reportes) {
+    document.querySelectorAll('[data-section="reports"]').forEach(function(e){ e.style.display='none'; });
+  }
+  // Config
+  if (!isAdmin && !p.ver_config) {
+    document.querySelectorAll('[data-section="settings"]').forEach(function(e){ e.style.display='none'; });
+  }
+  // Purchases
+  if (!isAdmin) {
+    // Keep purchases visible but check per-action
+  }
+  // Hide sidebar section labels if all children hidden
+  document.querySelectorAll('.sidebar-section-label').forEach(function(label){
+    var next = label.nextElementSibling;
+    var allHidden = true;
+    while (next && !next.classList.contains('sidebar-section-label')) {
+      if (next.style.display !== 'none') { allHidden = false; break; }
+      next = next.nextElementSibling;
+    }
+    if (allHidden) label.style.display = 'none';
+  });
 }
 
 // ============ SUPABASE CONFIG ============
@@ -1517,6 +1688,7 @@ async function gasCall(action, params = {}) {
       case 'getUsers':    return await apiGetUsers();
       case 'createUser':  return await apiCreateUser(params);
       case 'deleteUser':  return await apiDeleteUser(params);
+      case 'updateUserPermisos': return await apiUpdateUserPermisos(params);
 
       // ── REPORTS + DASHBOARD ──────────────────
       case 'getDashboard': return await apiGetDashboard();
@@ -1636,9 +1808,16 @@ async function apiSaveSettings(params) {
     body: JSON.stringify({
       business_name: params.businessName, direccion: params.address,
       telefono: params.phone, alert_phone: params.alertPhone,
-      meta_diaria: params.metaDiaria || 0, updated_at: new Date().toISOString()
+      meta_diaria: params.metaDiaria || 0,
+      logo_url: params.logoUrl || '', color_primary: params.colorPrimary || '#6C63FF',
+      moneda: params.moneda || 'CLP', impuesto: params.impuesto || 0,
+      rut: params.rut || '', razon_social: params.razonSocial || '',
+      metodos_pago: params.metodosPago || 'efectivo,transferencia,tarjeta',
+      updated_at: new Date().toISOString()
     })
   });
+  // Apply branding immediately
+  if (res.ok) applyBranding(params);
   return { success: res.ok };
 }
 
@@ -1893,17 +2072,35 @@ async function apiGetUsers() {
   const res = await sbFetch('/rest/v1/usuarios?negocio_id=eq.' + nid + '&activo=eq.true');
   if (!res.ok) return { success: false };
   return { success: true, data: res.data.map(function(u) {
-    return { id: u.id, name: u.nombre, login: u.login, role: u.rol };
+    return { id: u.id, name: u.nombre, login: u.login, role: u.rol,
+      permisos: u.permisos || {} };
   })};
 }
 async function apiCreateUser(params) {
   const nid = state.currentUser.negocio_id;
+  const defaultPermisos = {
+    ver_costos: params.role === 'admin',
+    ver_reportes: params.role === 'admin' || (params.permisos && params.permisos.ver_reportes) || false,
+    ver_config: params.role === 'admin' || (params.permisos && params.permisos.ver_config) || false,
+    hacer_descuentos: (params.permisos && params.permisos.hacer_descuentos) !== undefined ? params.permisos.hacer_descuentos : true,
+    anular_ventas: params.role === 'admin' || (params.permisos && params.permisos.anular_ventas) || false,
+    agregar_productos: params.role === 'admin' || (params.permisos && params.permisos.agregar_productos) || false
+  };
   const res = await sbFetch('/rest/v1/usuarios', {
     method: 'POST',
     body: JSON.stringify({ negocio_id: nid, nombre: params.name,
-      login: params.login, password: params.pass, rol: params.role || 'vendedor' })
+      login: params.login, password: params.pass, rol: params.role || 'vendedor',
+      permisos: params.permisos || defaultPermisos })
   });
   return { success: res.ok, message: res.ok ? null : 'Error al crear usuario' };
+}
+
+async function apiUpdateUserPermisos(params) {
+  const res = await sbFetch('/rest/v1/usuarios?id=eq.' + params.id, {
+    method: 'PATCH',
+    body: JSON.stringify({ permisos: params.permisos })
+  });
+  return { success: res.ok };
 }
 async function apiDeleteUser({ login }) {
   const nid = state.currentUser.negocio_id;
@@ -2846,16 +3043,41 @@ function renderTopProductsChart(data) {
 // ============ SETTINGS ============
 function loadSettings() {
   gasCall('getSettings').then(function(res){
-    if(res.success){ state.settings=res.data||{}; el('topBusinessName').textContent=state.settings.businessName||'Mi Negocio'; }
+    if(res.success){
+      state.settings=res.data||{};
+      el('topBusinessName').textContent=state.settings.businessName||'Mi Negocio';
+      applyBranding(state.settings);
+    }
   });
 }
 function loadSettingsSection() {
   var s = state.settings || {};
-  el('settingBusinessName').value = s.businessName||'';
-  el('settingAddress').value = s.address||'';
-  el('settingPhone').value = s.phone||'';
-  var alertPhoneEl = document.getElementById('settingAlertPhone');
-  if (alertPhoneEl) alertPhoneEl.value = s.alertPhone||'';
+  // Basic
+  var f = function(id, val){ var e=document.getElementById(id); if(e) e.value=val||''; };
+  f('settingBusinessName', s.businessName); f('settingAddress', s.address);
+  f('settingPhone', s.phone); f('settingAlertPhone', s.alertPhone);
+  f('settingRut', s.rut); f('settingRazonSocial', s.razonSocial);
+  f('settingLogoUrl', s.logoUrl); f('settingImpuesto', s.impuesto||0);
+  // Color
+  var colorEl = document.getElementById('settingColor');
+  if (colorEl && s.colorPrimary) { colorEl.value = s.colorPrimary; document.getElementById('colorPreviewLabel').textContent = s.colorPrimary; }
+  // Moneda
+  var monedaEl = document.getElementById('settingMoneda');
+  if (monedaEl && s.moneda) monedaEl.value = s.moneda;
+  // Methods of payment
+  if (s.metodosPago) {
+    var methods = s.metodosPago.split(',');
+    ['efectivo','transferencia','tarjeta','fiado'].forEach(function(m){
+      var cb = document.getElementById('pm_'+m);
+      if (cb) cb.checked = methods.indexOf(m) >= 0;
+    });
+  }
+  // Logo preview
+  if (s.logoUrl) {
+    var img = document.getElementById('topLogoImg');
+    if (img) { img.src = s.logoUrl; img.style.display = 'block'; var ph = document.getElementById('logoPlaceholder'); if(ph) ph.style.display = 'none'; }
+  }
+  // Toggles
   var goalEl = document.getElementById('dailyGoalInput');
   if (goalEl) goalEl.value = localStorage.getItem('stockapp_goal')||'';
   var desktopToggle = document.getElementById('desktopModeToggle');
@@ -2875,22 +3097,89 @@ function saveSettings() {
 }
 function loadUsers() {
   gasCall('getUsers').then(function(res){
-    if(!res.success)return;
-    el('usersList').innerHTML=res.data.map(function(u){
-      return '<div class="user-item"><div class="user-item-info"><div class="user-item-avatar">'+u.name.charAt(0).toUpperCase()+'</div>'
-        +'<div><div class="user-item-name">'+esc(u.name)+'</div><div class="user-item-role">'+u.role+'</div></div></div>'
-        +(u.login!=='admin'?'<button class="btn btn-sm btn-danger del-user-btn" data-login="'+esc(u.login)+'">🗑</button>':'')
-        +'</div>';
+    if(!res.success) return;
+    var ul = el('usersList');
+    ul.innerHTML = res.data.map(function(u){
+      var p = u.permisos || {};
+      var tags = [];
+      if (p.ver_costos) tags.push('Ver costos');
+      if (p.ver_reportes) tags.push('Reportes');
+      if (p.hacer_descuentos) tags.push('Descuentos');
+      if (p.anular_ventas) tags.push('Anular');
+      if (p.agregar_productos) tags.push('Agregar prods.');
+      return '<div class="user-item">'
+        +'<div class="user-item-left">'
+        +'<div class="user-avatar-sm">'+u.name.charAt(0).toUpperCase()+'</div>'
+        +'<div><div class="user-name">'+esc(u.name)+'</div>'
+        +'<div class="user-role">'+u.role+(u.login?' · '+esc(u.login):'')+'</div>'
+        +(tags.length?'<div class="user-perms">'+tags.map(function(t){ return '<span class="perm-tag">'+t+'</span>'; }).join('')+'</div>':'')
+        +'</div></div>'
+        +'<div style="display:flex;gap:6px">'
+        +(u.login!==state.currentUser.login?'<button class="btn btn-sm" style="background:var(--blue-bg);color:var(--blue);border:none" data-uid="'+u.id+'" data-uname="'+esc(u.name)+'" data-uperms="'+esc(JSON.stringify(p))+'" data-action="editperms">⚙️ Permisos</button>':'')
+        +(u.login!==state.currentUser.login?'<button class="btn btn-sm btn-danger del-user-btn" data-login="'+esc(u.login)+'">🗑</button>':'')
+        +'</div></div>';
     }).join('');
+
+    // Bind permission edit
+    ul.querySelectorAll('[data-action="editperms"]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var uid = btn.dataset.uid;
+        var uname = btn.dataset.uname;
+        var perms = {};
+        try { perms = JSON.parse(btn.dataset.uperms); } catch(e){}
+        showPermissionsEditor(uid, uname, perms);
+      });
+    });
   });
+}
+
+function showPermissionsEditor(uid, uname, perms) {
+  var permKeys = [
+    { key:'ver_costos', label:'Ver precios de costo' },
+    { key:'ver_reportes', label:'Ver reportes' },
+    { key:'ver_config', label:'Ver configuración' },
+    { key:'hacer_descuentos', label:'Hacer descuentos' },
+    { key:'anular_ventas', label:'Anular ventas' },
+    { key:'agregar_productos', label:'Agregar productos' }
+  ];
+  showBottomSheet('Permisos — '+uname,
+    '<div class="permisos-grid" style="margin-bottom:16px">'
+    + permKeys.map(function(pk){
+      return '<label class="permiso-item">'
+        +'<input type="checkbox" class="perm-check" data-key="'+pk.key+'" '+(perms[pk.key]?'checked':'')+'>'
+        +pk.label+'</label>';
+    }).join('')
+    +'</div>'
+    +'<button id="savePermsBtn" class="btn btn-primary btn-lg">💾 Guardar permisos</button>'
+  );
+  setTimeout(function(){
+    var saveBtn = document.getElementById('savePermsBtn');
+    if (saveBtn) saveBtn.addEventListener('click', function(){
+      var newPerms = {};
+      document.querySelectorAll('.perm-check').forEach(function(cb){ newPerms[cb.dataset.key] = cb.checked; });
+      showLoading('Guardando...');
+      gasCall('updateUserPermisos', { id: uid, permisos: newPerms }).then(function(res){
+        if (res.success) { toast('Permisos actualizados','success'); closeBottomSheet(); loadUsers(); }
+        else toast('Error','error');
+      }).finally(hideLoading);
+    });
+  }, 100);
 }
 function showUserForm() { el('userFormCard').classList.toggle('hidden'); }
 function hideUserForm() { hidden('userFormCard'); }
 function saveUser() {
   var name=el('newUserName').value.trim(), login=el('newUserLogin').value.trim(), pass=el('newUserPass').value.trim(), role=el('newUserRole').value;
   if(!name||!login||!pass){toast('Completa todos los campos','warning');return;}
+  var perms = {
+    ver_costos: document.getElementById('perm_ver_costos').checked,
+    ver_reportes: document.getElementById('perm_ver_reportes').checked,
+    ver_config: document.getElementById('perm_ver_config').checked,
+    hacer_descuentos: document.getElementById('perm_descuentos').checked,
+    anular_ventas: document.getElementById('perm_anular').checked,
+    agregar_productos: document.getElementById('perm_productos').checked
+  };
   showLoading('Creando...');
-  gasCall('createUser',{name:name,login:login,pass:pass,role:role}).then(function(res){
+  gasCall('createUser',{name:name,login:login,pass:pass,role:role,permisos:perms}).then(function(res){
     if(res.success){toast('Usuario creado','success');hideUserForm();loadUsers();}else toast(res.message||'Error','error');
   }).finally(hideLoading);
 }
@@ -2953,6 +3242,62 @@ function closeMoreDrawer() {
   hidden('moreDrawer');
   document.getElementById('moreMenuBtn').classList.remove('active');
 }
+
+// ============ BRANDING ============
+function applyBranding(s) {
+  if (!s) return;
+  // Primary color
+  if (s.colorPrimary) {
+    document.documentElement.style.setProperty('--accent', s.colorPrimary);
+    // Generate glow from hex
+    var hex = s.colorPrimary.replace('#','');
+    var r=parseInt(hex.slice(0,2),16), g=parseInt(hex.slice(2,4),16), b=parseInt(hex.slice(4,6),16);
+    document.documentElement.style.setProperty('--accent-glow', 'rgba('+r+','+g+','+b+',0.25)');
+    document.documentElement.style.setProperty('--accent2', s.colorPrimary);
+  }
+  // Logo
+  var logoEl = document.getElementById('topLogoImg');
+  if (logoEl && s.logoUrl) { logoEl.src = s.logoUrl; logoEl.style.display = 'block'; }
+  // Currency stored for use in fmt()
+  state.moneda = s.moneda || 'CLP';
+  state.impuesto = parseFloat(s.impuesto) || 0;
+  // Methods of payment
+  if (s.metodosPago) {
+    var methods = s.metodosPago.split(',').map(function(m){ return m.trim(); });
+    var payBtns = document.querySelector('.payment-btns');
+    if (payBtns) {
+      payBtns.innerHTML = methods.map(function(m){
+        var icons = { efectivo:'💵', transferencia:'📱', tarjeta:'💳', fiado:'📒' };
+        var labels = { efectivo:'Efectivo', transferencia:'Transferencia', tarjeta:'Tarjeta', fiado:'Fiado' };
+        return '<button class="pay-btn" data-method="'+m+'">'+(icons[m]||'💳')+' '+(labels[m]||m)+'</button>';
+      }).join('');
+      // Re-activate first
+      var first = payBtns.querySelector('.pay-btn');
+      if (first) { first.classList.add('active'); state.selectedPayment = first.dataset.method; }
+      // Re-bind
+      payBtns.querySelectorAll('.pay-btn').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          payBtns.querySelectorAll('.pay-btn').forEach(function(b){ b.classList.remove('active'); });
+          btn.classList.add('active');
+          state.selectedPayment = btn.dataset.method;
+          if (btn.dataset.method === 'efectivo') show('cashChangeRow');
+          else { hidden('cashChangeRow'); hidden('changeDisplay'); el('cashReceived').value=''; }
+          handleFiadoSelection();
+        });
+      });
+    }
+  }
+}
+
+// Override fmt() to use dynamic currency
+var _fmtOrig = fmt;
+fmt = function(n) {
+  var moneda = (state && state.moneda) || 'CLP';
+  var locales = { CLP:'es-CL', USD:'en-US', EUR:'es-ES', PEN:'es-PE', ARS:'es-AR', MXN:'es-MX', COP:'es-CO' };
+  try {
+    return new Intl.NumberFormat(locales[moneda]||'es-CL',{style:'currency',currency:moneda,maximumFractionDigits:moneda==='CLP'?0:2}).format(parseFloat(n)||0);
+  } catch(e) { return _fmtOrig(n); }
+};
 
 // ============ LAYOUT MODE ============
 function applyLayout(mode) {
@@ -3123,629 +3468,271 @@ function handleFiadoSelection() {
   }
 }
 
-// ============ ORDER PAGE (PUBLIC) ============
-var orderCart = [];
-function initOrderPage() {
-  // Check URL param ?order=1 or ?pedido=1
+// ============ CATALOG (PUBLIC) ============
+var catalogCart = [];
+var catalogProducts = [];
+var catalogSettings = {};
+var catalogActiveCategory = 'all';
+
+function initCatalogPage() {
   var params = new URLSearchParams(window.location.search);
-  if (params.get('pedido') === '1' || params.get('order') === '1') {
-    hidden('loginScreen');
-    show('orderScreen');
-    loadOrderCatalog();
+  if (params.get('pedido') === '1' || params.get('catalog') === '1') {
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.add('hidden'); s.classList.remove('active'); });
+    var os = document.getElementById('orderScreen');
+    os.classList.remove('hidden'); os.classList.add('active');
+    loadCatalog();
+    bindCatalogEvents();
   }
 }
-function loadOrderCatalog() {
-  gasCall('getPublicCatalog', {}).then(function(res) {
-    if (!res.success) { document.getElementById('orderBizName').textContent = 'Catálogo'; return; }
-    var d = res.data;
-    document.getElementById('orderBizName').textContent = d.businessName || 'Catálogo';
-    var products = d.products || [];
-    var grid = document.getElementById('orderProductsGrid');
-    grid.className = 'products-grid';
-    grid.innerHTML = products.filter(function(p){ return parseInt(p.stock)>0; }).map(function(p){
-      return '<div class="product-grid-card" data-pid="'+p.id+'">'
-        +'<div class="product-grid-img">'+(p.imageUrl?'<img src="'+p.imageUrl+'" style="max-width:100%;max-height:100%">':'📦')+'</div>'
-        +'<div class="product-grid-body">'
-        +'<div class="product-grid-name">'+esc(p.name)+'</div>'
-        +'<div class="product-grid-price">'+fmt(p.salePrice)+'</div>'
-        +'</div>'
-        +'<button class="product-grid-add order-add-btn" data-pid="'+p.id+'" data-name="'+esc(p.name)+'" data-price="'+p.salePrice+'">+</button>'
-        +'</div>';
-    }).join('');
-    // Bind add buttons
-    grid.querySelectorAll('.order-add-btn').forEach(function(btn){
-      btn.addEventListener('click', function(e){
-        e.stopPropagation();
-        addToOrderCart(btn.dataset.pid, btn.dataset.name, parseFloat(btn.dataset.price)||0);
-      });
-    });
-    grid.querySelectorAll('.product-grid-card').forEach(function(card){
-      card.addEventListener('click', function(){
-        var btn = card.querySelector('.order-add-btn');
-        if (btn) addToOrderCart(btn.dataset.pid, btn.dataset.name, parseFloat(btn.dataset.price)||0);
-      });
-    });
-  });
-}
-function addToOrderCart(pid, name, price) {
-  var idx = orderCart.findIndex(function(i){ return i.id===pid; });
-  if (idx >= 0) orderCart[idx].qty++;
-  else orderCart.push({ id:pid, name:name, price:price, qty:1 });
-  updateOrderCartFab();
-  toast(name+' agregado','success',1200);
-}
-function updateOrderCartFab() {
-  var total = orderCart.reduce(function(s,i){ return s+i.price*i.qty; }, 0);
-  var count = orderCart.reduce(function(s,i){ return s+i.qty; }, 0);
-  document.getElementById('orderCartCount').textContent = count;
-  document.getElementById('orderCartTotal').textContent = fmt(total);
-  document.getElementById('orderTotalDisplay').textContent = fmt(total);
-  var fab = document.getElementById('orderCartFab');
-  if (count > 0) fab.classList.remove('hidden');
-  else fab.classList.add('hidden');
-  // Render cart items in checkout
-  var ci = document.getElementById('orderCartItems');
-  ci.innerHTML = orderCart.map(function(item){
-    return '<div class="cart-item"><div class="cart-item-info">'
-      +'<div class="cart-item-name">'+esc(item.name)+'</div>'
-      +'<div class="cart-item-price">'+fmt(item.price)+' × '+item.qty+'</div>'
-      +'</div><div class="cart-item-total">'+fmt(item.price*item.qty)+'</div></div>';
-  }).join('');
-}
-function sendOrderWhatsApp() {
-  var name = document.getElementById('orderClientName').value.trim();
-  var phone = document.getElementById('orderClientPhone').value.trim();
-  var notes = document.getElementById('orderNotes').value.trim();
-  if (!name) { toast('Ingresa tu nombre','warning'); return; }
-  if (!phone) { toast('Ingresa tu teléfono','warning'); return; }
-  if (!orderCart.length) { toast('Agrega productos al pedido','warning'); return; }
-  var total = orderCart.reduce(function(s,i){ return s+i.price*i.qty; }, 0);
-  // Save to history
-  saveOrderToHistory({ clientName:name, clientPhone:phone, notes:notes, items:orderCart.map(function(i){ return {name:i.name,qty:i.qty,price:i.price}; }), total:total });
-  var lines = ['🛒 *Pedido nuevo*',''];
-  lines.push('👤 Cliente: '+name);
-  lines.push('📞 Teléfono: '+phone);
-  lines.push('');
-  lines.push('📦 Productos:');
-  orderCart.forEach(function(item){
-    lines.push('  • '+item.qty+'x '+item.name+' — '+fmt(item.price*item.qty));
-  });
-  lines.push('');
-  lines.push('💰 *Total estimado: '+fmt(total)+'*');
-  if (notes) lines.push('📝 Notas: '+notes);
-  var sellerPhone = (state.settings && state.settings.phone) || '';
-  var msg = encodeURIComponent(lines.join('\n'));
-  var url = sellerPhone
-    ? 'https://wa.me/'+sellerPhone.replace(/[^0-9]/g,'')+' ?text='+msg
-    : 'https://wa.me/?text='+msg;
-  window.open(url, '_blank');
-}
 
-
-// ============ ORDER HISTORY (localStorage) ============
-function saveOrderToHistory(order) {
-  var key = 'stockapp_orders';
-  var orders = getOrderHistory();
-  order.id = 'PED-' + Date.now();
-  order.savedAt = new Date().toLocaleString('es-CL');
-  order.status = 'pendiente'; // pendiente | confirmado | cancelado
-  orders.unshift(order);
-  if (orders.length > 100) orders = orders.slice(0, 100); // cap at 100
-  try { localStorage.setItem(key, JSON.stringify(orders)); } catch(e) {}
-  return order.id;
-}
-function getOrderHistory() {
-  try { return JSON.parse(localStorage.getItem('stockapp_orders') || '[]'); } catch(e) { return []; }
-}
-function loadOrdersSection() {
-  var orders = getOrderHistory();
-  var totalVal = orders.reduce(function(s,o){ return s + (o.total||0); }, 0);
-  el('ordersTotalCount').textContent = orders.length;
-  el('ordersTotalValue').textContent = fmt(totalVal);
-  var list = el('ordersHistoryList');
-  if (!orders.length) {
-    list.innerHTML = '<div class="empty-state"><span>📲</span><p>Sin pedidos aún</p><small>Los pedidos enviados por WhatsApp aparecerán aquí</small></div>';
+async function loadCatalog() {
+  var savedNid = localStorage.getItem('stockapp_catalog_negocio_id');
+  // Try to get negocio from URL param or stored
+  var params = new URLSearchParams(window.location.search);
+  var nid = params.get('nid') || savedNid;
+  if (!nid) {
+    // Try to get from catalog_url
+    var storedUrl = localStorage.getItem('stockapp_catalog_url');
+    document.getElementById('orderBizName').textContent = 'Catálogo no disponible';
     return;
   }
-  list.innerHTML = orders.map(function(o) {
-    var statusColor = { pendiente:'var(--yellow)', confirmado:'var(--green)', cancelado:'var(--red)' }[o.status] || 'var(--text2)';
-    var statusLabel = { pendiente:'⏳ Pendiente', confirmado:'✅ Confirmado', cancelado:'❌ Cancelado' }[o.status] || o.status;
-    return '<div class="order-history-card" data-oid="'+o.id+'">'
-      +'<div class="order-history-header">'
-      +'<div>'
-      +'<div style="font-weight:700;font-size:14px">'+esc(o.clientName||'Sin nombre')+'</div>'
-      +'<div style="font-size:12px;color:var(--text2)">'+esc(o.clientPhone||'')+'  ·  '+esc(o.savedAt||'')+'</div>'
-      +'</div>'
-      +'<div style="text-align:right">'
-      +'<div style="font-family:var(--font);font-size:16px;font-weight:800;color:var(--green)">'+fmt(o.total||0)+'</div>'
-      +'<div style="font-size:11px;font-weight:700;color:'+statusColor+'">'+statusLabel+'</div>'
-      +'</div></div>'
-      +'<div style="font-size:12px;color:var(--text2);margin:6px 0 10px;padding:0 2px">'
-      +(o.items||[]).map(function(i){ return i.qty+'× '+esc(i.name); }).join('  ·  ')
-      +'</div>'
-      +'<div class="order-history-actions">'
-      +'<button class="btn btn-sm btn-whatsapp" data-oid="'+o.id+'">📲 Reenviar</button>'
-      +'<button class="btn btn-sm btn-success" data-oid="'+o.id+'" data-action="confirm">✅ Confirmar</button>'
-      +'<button class="btn btn-sm btn-danger" data-oid="'+o.id+'" data-action="cancel">✕ Cancelar</button>'
-      +'</div></div>';
-  }).join('');
-}
-function updateOrderStatus(oid, status) {
-  var orders = getOrderHistory();
-  var o = orders.find(function(x){ return x.id === oid; });
-  if (o) {
-    o.status = status;
-    try { localStorage.setItem('stockapp_orders', JSON.stringify(orders)); } catch(e) {}
-    loadOrdersSection();
-    toast(status === 'confirmado' ? 'Pedido confirmado' : 'Pedido cancelado', status === 'confirmado' ? 'success' : 'warning');
+
+  // Load settings
+  var [settingsRes, productsRes] = await Promise.all([
+    sbFetch('/rest/v1/configuracion?negocio_id=eq.' + nid),
+    sbFetch('/rest/v1/productos?negocio_id=eq.' + nid + '&activo=eq.true&stock=gt.0&order=categoria.asc,nombre.asc'),
+    sbFetch('/rest/v1/negocios?id=eq.' + nid + '&select=nombre,plan')
+  ]);
+
+  // Check plan
+  var negRes = await sbFetch('/rest/v1/negocios?id=eq.' + nid + '&select=nombre,plan');
+  var neg = negRes.data && negRes.data[0];
+  if (!neg || neg.plan === 'blocked') {
+    document.getElementById('catalogBody').innerHTML = '<div class="cat-empty"><div class="cat-empty-icon">🔒</div><p>Catálogo no disponible</p></div>';
+    return;
   }
-}
-function resendOrderWhatsApp(oid) {
-  var orders = getOrderHistory();
-  var o = orders.find(function(x){ return x.id === oid; });
-  if (!o) return;
-  var lines = ['🛒 *Pedido #'+oid+'* (reenvío)',''];
-  lines.push('👤 '+esc(o.clientName||''));
-  lines.push('📞 '+(o.clientPhone||''));
-  lines.push('');
-  lines.push('📦 Productos:');
-  (o.items||[]).forEach(function(i){ lines.push('  • '+i.qty+'x '+i.name+' — '+fmt(i.price*i.qty)); });
-  lines.push('');
-  lines.push('💰 *Total: '+fmt(o.total)+'*');
-  if (o.notes) lines.push('📝 '+o.notes);
-  var sellerPhone = (state.settings && state.settings.phone) || '';
-  var msg = encodeURIComponent(lines.join('\n'));
-  var url = sellerPhone
-    ? 'https://wa.me/'+sellerPhone.replace(/[^0-9]/g,'')+' ?text='+msg
-    : 'https://wa.me/?text='+msg;
-  window.open(url, '_blank');
-}
 
-// ============ CATALOG LINK ============
-function showQRCatalog() {
-  var savedUrl = localStorage.getItem('stockapp_catalog_url') || '';
-  var biz = (state.settings && state.settings.businessName) || 'Mi Negocio';
-  var hasUrl = savedUrl.length > 0;
-  var orderUrl = hasUrl ? savedUrl + '?pedido=1' : '';
-  showBottomSheet('Link del Catalogo',
-    '<div style="padding:4px 0">'
-    + '<div style="background:var(--yellow-bg);border:1px solid rgba(255,184,48,0.2);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;font-size:13px;color:var(--yellow);line-height:1.5">'
-    + 'Copia la URL de la barra del navegador y pegala aqui una unica vez.'
-    + '</div>'
-    + '<div class="form-group">'
-    + '<label style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:7px">URL de tu app</label>'
-    + '<input type="url" id="catalogUrlInput" value="' + savedUrl + '" placeholder="https://script.google.com/macros/s/.../exec" style="width:100%;padding:12px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:12px;outline:none;font-family:monospace">'
-    + '</div>'
-    + '<button id="generateCatalogBtn" class="btn btn-primary btn-lg" style="margin-bottom:16px">Guardar y generar link</button>'
-    + '<div id="catalogLinkResult" style="display:' + (hasUrl ? 'block' : 'none') + '">'
-    + '<div style="background:var(--bg2);border:1.5px solid var(--accent);border-radius:var(--r);padding:14px;margin-bottom:12px">'
-    + '<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Tu link de catalogo</div>'
-    + '<div id="catalogLinkText" style="font-size:12px;color:var(--accent2);word-break:break-all;font-family:monospace;line-height:1.6">' + orderUrl + '</div>'
-    + '</div>'
-    + '<div style="display:flex;gap:10px">'
-    + '<button id="copyQRLink" class="btn btn-outline" style="flex:1">Copiar</button>'
-    + '<button id="shareQRLink" class="btn btn-whatsapp" style="flex:1">Compartir WA</button>'
-    + '</div></div>'
-    + '</div>'
-  );
-  setTimeout(function(){
-    var input = document.getElementById('catalogUrlInput');
-    var result = document.getElementById('catalogLinkResult');
-    var linkText = document.getElementById('catalogLinkText');
-    var genBtn = document.getElementById('generateCatalogBtn');
-    if (genBtn) genBtn.addEventListener('click', function(){
-      var val = input ? input.value.trim() : '';
-      if (!val) { toast('Pega la URL primero','warning'); return; }
-      var clean = val.split('?')[0].split('#')[0];
-      var url = clean + '?pedido=1';
-      localStorage.setItem('stockapp_catalog_url', clean);
-      if (linkText) linkText.textContent = url;
-      if (result) result.style.display = 'block';
-      toast('Link guardado','success');
-    });
-    var copyBtn = document.getElementById('copyQRLink');
-    if (copyBtn) copyBtn.addEventListener('click', function(){
-      var url = linkText ? linkText.textContent : '';
-      var ta = document.createElement('textarea');
-      ta.value = url;
-      ta.style.position = 'fixed'; ta.style.top = '-9999px';
-      document.body.appendChild(ta); ta.focus(); ta.select();
-      try { document.execCommand('copy'); toast('Copiado!','success'); }
-      catch(e) { prompt('Copia este link:', url); }
-      document.body.removeChild(ta);
-    });
-    var shareBtn = document.getElementById('shareQRLink');
-    if (shareBtn) shareBtn.addEventListener('click', function(){
-      var url = linkText ? linkText.textContent : '';
-      var msg = 'Hola! Te comparto el catalogo de *' + biz + '*.\n\nVe los productos y enviame tu pedido:\n' + url + '\n\nGracias!';
-      if (navigator.share) {
-        navigator.share({ title: 'Catalogo ' + biz, url: url }).catch(function(){
-          window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
-        });
-      } else {
-        window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
-      }
-    });
-  }, 150);
-}
+  catalogSettings = (settingsRes.data && settingsRes.data[0]) || {};
+  catalogProducts = productsRes.data || [];
 
-
-// ============ ACTIVITY LOG ============
-function logActivity(type, msg) {
-  var key = 'stockapp_activity';
-  var log = getActivityLog();
-  log.unshift({
-    type: type, msg: msg,
-    user: state.currentUser ? state.currentUser.name : 'Sistema',
-    ts: new Date().toLocaleString('es-CL')
-  });
-  if (log.length > 500) log = log.slice(0, 500);
-  try { localStorage.setItem(key, JSON.stringify(log)); } catch(e) {}
-}
-function getActivityLog() {
-  try { return JSON.parse(localStorage.getItem('stockapp_activity') || '[]'); } catch(e) { return []; }
-}
-function loadActivitySection() {
-  var log = getActivityLog();
-  var list = el('activityList');
-  var q = (el('activitySearch').value || '').toLowerCase();
-  var filtered = q ? log.filter(function(i){ return i.msg.toLowerCase().includes(q) || i.user.toLowerCase().includes(q); }) : log;
-  if (!filtered.length) { list.innerHTML = '<div class="empty-state"><span>📋</span><p>Sin actividad</p></div>'; return; }
-  list.innerHTML = filtered.map(function(item) {
-    return '<div class="activity-item">'
-      + '<div class="activity-dot ' + (item.type||'sale') + '"></div>'
-      + '<div class="activity-info">'
-      + '<div class="activity-msg">' + esc(item.msg) + '</div>'
-      + '<div class="activity-meta">' + esc(item.user) + ' · ' + esc(item.ts) + '</div>'
-      + '</div></div>';
-  }).join('');
-}
-
-// Patch key functions to log activity
-var _origConfirmSale = confirmSale;
-confirmSale = function() {
-  var origCart = state.cart.slice();
-  _origConfirmSale.apply(this, arguments);
-};
-
-// ============ PAYABLES ============
-function loadPayablesSection() {
-  showLoading('Cargando...');
-  gasCall('getPayables').then(function(res) {
-    hideLoading();
-    if (!res.success) return;
-    var items = res.data || [];
-    var total = items.filter(function(p){ return p.status!=='pagada'; }).reduce(function(s,p){ return s+parseFloat(p.amount||0); }, 0);
-    var overdue = items.filter(function(p){ return p.status==='vencida'; }).length;
-    el('payablesTotalPending').textContent = fmt(total);
-    el('payablesOverdue').textContent = overdue;
-    var list = el('payablesList');
-    if (!items.length) { list.innerHTML = '<div class="empty-state"><span>💸</span><p>Sin cuentas pendientes</p></div>'; return; }
-    list.innerHTML = items.map(function(p) {
-      var isOverdue = p.status === 'vencida';
-      var isPaid = p.status === 'pagada';
-      return '<div class="payable-card' + (isOverdue?' overdue':'') + '">'
-        + '<div class="payable-header">'
-        + '<div><div style="font-weight:700;font-size:15px">' + esc(p.supplier||'Sin proveedor') + '</div>'
-        + '<div style="font-size:12px;color:var(--text2)">' + esc(p.description||'') + ' · Vence: ' + esc(p.dueDate||'-') + '</div></div>'
-        + '<div style="text-align:right">'
-        + '<div style="font-family:var(--font);font-size:18px;font-weight:800;color:' + (isPaid?'var(--green)':isOverdue?'var(--red)':'var(--text)') + '">' + fmt(p.amount) + '</div>'
-        + '<div style="font-size:11px;font-weight:700;color:' + (isPaid?'var(--green)':isOverdue?'var(--red)':'var(--yellow)') + '">' + (isPaid?'✅ Pagada':isOverdue?'⚠ Vencida':'⏳ Pendiente') + '</div>'
-        + '</div></div>'
-        + (!isPaid ? '<div class="payable-actions">'
-          + '<button class="btn btn-success" data-payid="'+p.id+'" data-action="pay">💰 Marcar pagada</button>'
-          + '<button class="btn btn-whatsapp" data-payid="'+p.id+'" data-supplier="'+esc(p.supplier||'')+'" data-amount="'+p.amount+'" data-action="remind">📲 Recordar</button>'
-          + '</div>' : '')
-        + '</div>';
-    }).join('');
-  }).catch(function(){ hideLoading(); });
-}
-function showAddPayableForm() {
-  showBottomSheet('Nueva Cuenta por Pagar',
-    '<div class="form-group"><label>Proveedor *</label><input type="text" id="paySupplier" placeholder="Nombre del proveedor"></div>'
-    + '<div class="form-group"><label>Descripción</label><input type="text" id="payDesc" placeholder="Ej: Factura mayo"></div>'
-    + '<div class="form-row">'
-    + '<div class="form-group"><label>Monto *</label><input type="number" id="payAmount2" placeholder="$0" min="0"></div>'
-    + '<div class="form-group"><label>Fecha vencimiento</label><input type="date" id="payDue"></div>'
-    + '</div>'
-    + '<div class="form-actions"><button id="savePayableBtn" class="btn btn-primary">💾 Guardar</button><button id="cancelPayableBtn" class="btn btn-outline">Cancelar</button></div>'
-  );
-  setTimeout(function(){
-    var s = document.getElementById('savePayableBtn');
-    if (s) s.addEventListener('click', function(){
-      var supplier = document.getElementById('paySupplier').value.trim();
-      var amount = parseFloat(document.getElementById('payAmount2').value)||0;
-      if (!supplier || !amount) { toast('Completa proveedor y monto','warning'); return; }
-      showLoading('Guardando...');
-      gasCall('createPayable',{ supplier:supplier, description:document.getElementById('payDesc').value.trim(), amount:amount, dueDate:document.getElementById('payDue').value })
-        .then(function(res){
-          if (res.success) { toast('Cuenta registrada','success'); closeBottomSheet(); loadPayablesSection(); logActivity('purchase','Cuenta por pagar: '+supplier+' '+fmt(amount)); }
-          else toast(res.message||'Error','error');
-        }).finally(hideLoading);
-    });
-    var c = document.getElementById('cancelPayableBtn');
-    if (c) c.addEventListener('click', closeBottomSheet);
-  }, 100);
-}
-
-// ============ QUOTES / PRESUPUESTOS ============
-function loadQuotesSection() {
-  var quotes = getLocalQuotes();
-  el('quotesTotalCount').textContent = quotes.length;
-  el('quotesAccepted').textContent = quotes.filter(function(q){ return q.status==='accepted'; }).length;
-  var list = el('quotesList');
-  if (!quotes.length) { list.innerHTML = '<div class="empty-state"><span>📄</span><p>Sin presupuestos</p></div>'; return; }
-  list.innerHTML = quotes.map(function(q) {
-    var statusMap = { pending:'pending', accepted:'accepted', rejected:'rejected' };
-    var statusLabel = { pending:'⏳ Pendiente', accepted:'✅ Aceptado', rejected:'❌ Rechazado' };
-    return '<div class="quote-card">'
-      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
-      + '<div><div style="font-weight:700;font-size:15px">' + esc(q.clientName||'Sin cliente') + '</div>'
-      + '<div style="font-size:12px;color:var(--text2)">' + esc(q.id) + ' · ' + esc(q.date||'') + '</div></div>'
-      + '<div style="text-align:right">'
-      + '<div style="font-family:var(--font);font-size:18px;font-weight:800;color:var(--green)">' + fmt(q.total) + '</div>'
-      + '<span class="quote-status ' + (statusMap[q.status]||'pending') + '">' + (statusLabel[q.status]||'Pendiente') + '</span>'
-      + '</div></div>'
-      + '<div style="font-size:12px;color:var(--text2);margin-bottom:10px">'
-      + (q.items||[]).map(function(i){ return i.qty+'× '+i.name; }).join(' · ')
-      + '</div>'
-      + '<div class="quote-actions">'
-      + '<button class="btn btn-whatsapp" data-qid="'+q.id+'" data-action="send">📲 Enviar</button>'
-      + (q.status==='pending'?'<button class="btn btn-success" data-qid="'+q.id+'" data-action="accept">✅ Aceptar</button>':'')
-      + (q.status==='pending'?'<button class="btn btn-danger" data-qid="'+q.id+'" data-action="reject">✕ Rechazar</button>':'')
-      + '</div></div>';
-  }).join('');
-}
-function getLocalQuotes() {
-  try { return JSON.parse(localStorage.getItem('stockapp_quotes')||'[]'); } catch(e) { return []; }
-}
-function saveLocalQuotes(arr) {
-  try { localStorage.setItem('stockapp_quotes', JSON.stringify(arr)); } catch(e) {}
-}
-function buildQuoteFromCart() {
-  // Build quote using current cart
-  if (!state.cart.length) { toast('El carrito está vacío','warning'); return; }
-  showBottomSheet('Nuevo Presupuesto',
-    '<div class="form-group"><label>Cliente *</label><input type="text" id="qClientName" placeholder="Nombre del cliente"></div>'
-    + '<div class="form-group"><label>Teléfono</label><input type="tel" id="qClientPhone" placeholder="+56 9..."></div>'
-    + '<div class="form-group"><label>Validez</label><select id="qValidity"><option value="3">3 días</option><option value="7" selected>7 días</option><option value="15">15 días</option><option value="30">30 días</option></select></div>'
-    + '<div class="form-group"><label>Notas</label><textarea id="qNotes" rows="2" placeholder="Condiciones, detalles..."></textarea></div>'
-    + '<div class="form-actions"><button id="saveQuoteBtn" class="btn btn-primary">💾 Guardar y enviar</button><button id="cancelQuoteBtn" class="btn btn-outline">Cancelar</button></div>'
-  );
-  setTimeout(function(){
-    var s = document.getElementById('saveQuoteBtn');
-    if (s) s.addEventListener('click', function(){
-      var clientName = document.getElementById('qClientName').value.trim();
-      if (!clientName) { toast('Nombre del cliente requerido','warning'); return; }
-      var phone = document.getElementById('qClientPhone').value.trim();
-      var validity = document.getElementById('qValidity').value;
-      var notes = document.getElementById('qNotes').value.trim();
-      var sub = state.cart.reduce(function(s,i){ return s+i.salePrice*i.qty; },0);
-      var disc = parseFloat(el('discountInput').value)||0;
-      var total = sub*(1-disc/100);
-      var id = 'COT-'+Date.now();
-      var quote = {
-        id:id, clientName:clientName, clientPhone:phone,
-        items:state.cart.map(function(i){ return {name:i.name,qty:i.qty,price:i.salePrice}; }),
-        subtotal:sub, discount:disc, total:total,
-        validity:validity, notes:notes,
-        date:new Date().toLocaleDateString('es-CL'), status:'pending'
-      };
-      var quotes = getLocalQuotes();
-      quotes.unshift(quote);
-      saveLocalQuotes(quotes);
-      logActivity('product','Presupuesto creado: '+id+' para '+clientName);
-      sendQuoteWhatsApp(quote);
-      closeBottomSheet();
-      toast('Presupuesto guardado','success');
-    });
-    var c = document.getElementById('cancelQuoteBtn');
-    if (c) c.addEventListener('click', closeBottomSheet);
-  }, 100);
-}
-function sendQuoteWhatsApp(q) {
-  var biz = (state.settings && state.settings.businessName) || 'nuestro negocio';
-  var phone = q.clientPhone || '';
-  var lines = ['📄 *Presupuesto ' + q.id + '*', '🏪 ' + biz, ''];
-  lines.push('👤 Cliente: ' + q.clientName);
-  lines.push('📅 Fecha: ' + q.date + ' · Validez: ' + q.validity + ' días');
-  lines.push('');
-  lines.push('📦 *Detalle:*');
-  (q.items||[]).forEach(function(i){ lines.push('  • ' + i.qty + 'x ' + i.name + ' — ' + fmt(i.price*i.qty)); });
-  lines.push('');
-  if (q.discount > 0) lines.push('Descuento: ' + q.discount + '%');
-  lines.push('💰 *TOTAL: ' + fmt(q.total) + '*');
-  if (q.notes) lines.push('\n📝 ' + q.notes);
-  lines.push('\n_Presupuesto válido por ' + q.validity + ' días._');
-  var msg = encodeURIComponent(lines.join('\n'));
-  var url = phone ? 'https://wa.me/' + phone.replace(/[^0-9]/g,'') + '?text=' + msg : 'https://wa.me/?text=' + msg;
-  window.open(url, '_blank');
-}
-function updateQuoteStatus(qid, status) {
-  var quotes = getLocalQuotes();
-  var q = quotes.find(function(x){ return x.id===qid; });
-  if (q) { q.status = status; saveLocalQuotes(quotes); loadQuotesSection(); logActivity('product','Presupuesto '+qid+': '+status); }
-}
-
-// ============ SALE CHANNEL ============
-function setSaleChannel(channel) {
-  state.saleChannel = channel;
-  document.querySelectorAll('.channel-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.channel===channel); });
-}
-
-// ============ RESTOCK ALERTS ============
-function checkRestockAlerts() {
-  var alertPhone = state.settings && state.settings.alertPhone;
-  if (!alertPhone) return;
-  var lowProds = state.products.filter(function(p){ return parseInt(p.stock) <= parseInt(p.minStock||0) && parseInt(p.minStock||0) > 0; });
-  if (!lowProds.length) return;
-  var lastAlert = localStorage.getItem('stockapp_last_alert');
-  var today = new Date().toDateString();
-  if (lastAlert === today) return; // only once per day
-  localStorage.setItem('stockapp_last_alert', today);
-  var biz = (state.settings && state.settings.businessName) || 'tu negocio';
-  var lines = ['⚠️ *Alerta de Stock — ' + biz + '*', ''];
-  lines.push('Los siguientes productos necesitan reabastecimiento:');
-  lowProds.slice(0,10).forEach(function(p){ lines.push('  • ' + p.name + ' (stock: ' + p.stock + ' / mín: ' + p.minStock + ')'); });
-  var msg = encodeURIComponent(lines.join('\n'));
-  window.open('https://wa.me/' + alertPhone.replace(/[^0-9]/g,'') + '?text=' + msg, '_blank');
-}
-
-// ============ AUTO BACKUP ============
-function initAutoBackup() {
-  var enabled = localStorage.getItem('stockapp_autobackup') === '1';
-  var toggle = document.getElementById('autoBackupToggle');
-  if (toggle) toggle.checked = enabled;
-  if (enabled) {
-    var lastBackup = localStorage.getItem('stockapp_last_backup');
-    var today = new Date().toDateString();
-    if (lastBackup !== today) {
-      localStorage.setItem('stockapp_last_backup', today);
-      setTimeout(function(){
-        gasCall('createBackup').then(function(res){
-          if (res.success) { toast('Respaldo automático creado','success',2000); logActivity('product','Respaldo automático realizado'); }
-        });
-      }, 5000); // 5s after app load
-    }
+  // Apply branding to catalog
+  var bizName = catalogSettings.business_name || neg.nombre || 'Mi Negocio';
+  document.getElementById('orderBizName').textContent = bizName;
+  if (catalogSettings.color_primary) {
+    document.documentElement.style.setProperty('--accent', catalogSettings.color_primary);
+    var hex = catalogSettings.color_primary.replace('#','');
+    var r=parseInt(hex.slice(0,2),16), g=parseInt(hex.slice(2,4),16), b=parseInt(hex.slice(4,6),16);
+    document.documentElement.style.setProperty('--accent-glow', 'rgba('+r+','+g+','+b+',0.25)');
   }
-}
+  if (catalogSettings.logo_url) {
+    var logoEl = document.getElementById('catLogoWrap');
+    logoEl.innerHTML = '<img src="'+catalogSettings.logo_url+'" style="width:100%;height:100%;object-fit:contain;border-radius:8px">';
+  }
+  if (catalogSettings.business_name) {
+    document.getElementById('orderBizSub').textContent = (catalogSettings.direccion || '') + (catalogSettings.telefono ? ' · ' + catalogSettings.telefono : '');
+  }
 
-// ============ KITS ============
-function loadKitsSection() {
-  gasCall('getKits').then(function(res){
-    if (!res.success) return;
-    var kits = res.data||[];
-    var list = el('kitsList');
-    if (!kits.length) { list.innerHTML = '<div class="empty-state" style="grid-column:span 3"><span>🧩</span><p>Sin kits creados</p></div>'; return; }
-    list.innerHTML = kits.map(function(k){
-      return '<div class="product-card">'
-        + '<div class="product-card-img">🧩</div>'
-        + '<div class="product-card-body">'
-        + '<div class="product-card-name">' + esc(k.name) + '</div>'
-        + '<div class="product-card-price">' + fmt(k.salePrice) + '</div>'
-        + '<div style="font-size:11px;color:var(--text3);margin-top:4px">' + (k.components||[]).length + ' componentes</div>'
-        + '</div>'
-        + '<div class="product-card-actions">'
-        + '<button class="btn-edit" data-kid="'+k.id+'">✏️ Editar</button>'
-        + '<button class="btn-delete" data-kid="'+k.id+'" data-name="'+esc(k.name)+'">🗑</button>'
-        + '</div></div>';
-    }).join('');
-  });
-}
-function showAddKitForm() {
-  if (!state.products.length) { toast('Carga el inventario primero','warning'); return; }
-  var productOptions = state.products.map(function(p){
-    return '<option value="'+p.id+'">'+esc(p.name)+' (Stock: '+p.stock+')</option>';
+  // Build category pills
+  var cats = ['all'].concat([...new Set(catalogProducts.map(function(p){ return p.categoria; }).filter(Boolean))]);
+  var catWrap = document.getElementById('catCategories');
+  catWrap.innerHTML = cats.map(function(c){
+    return '<button class="cat-pill'+(c==='all'?' active':'')+'" data-cat="'+c+'">'+(c==='all'?'Todos':c)+'</button>';
   }).join('');
-  showBottomSheet('Nuevo Kit / Receta',
-    '<div class="form-group"><label>Nombre del kit *</label><input type="text" id="kitName" placeholder="Ej: Combo desayuno"></div>'
-    + '<div class="form-row">'
-    + '<div class="form-group"><label>Precio venta *</label><input type="number" id="kitPrice" placeholder="$0" min="0"></div>'
-    + '<div class="form-group"><label>Stock mínimo</label><input type="number" id="kitMinStock" placeholder="5" min="0"></div>'
-    + '</div>'
-    + '<div class="form-group"><label>Componentes</label>'
-    + '<div id="kitComponents"><div class="kit-comp-row" style="display:flex;gap:8px;margin-bottom:8px">'
-    + '<select class="kit-comp-select" style="flex:1;padding:10px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:14px">' + productOptions + '</select>'
-    + '<input type="number" class="kit-comp-qty" placeholder="Cant." min="1" value="1" style="width:70px;padding:10px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:14px">'
-    + '</div></div>'
-    + '<button id="addKitCompBtn" class="btn btn-outline btn-sm" style="margin-top:4px">+ Agregar componente</button></div>'
-    + '<div class="form-actions" style="margin-top:16px"><button id="saveKitBtn" class="btn btn-primary">💾 Guardar Kit</button><button id="cancelKitBtn" class="btn btn-outline">Cancelar</button></div>'
-  );
-  setTimeout(function(){
-    var addComp = document.getElementById('addKitCompBtn');
-    if (addComp) addComp.addEventListener('click', function(){
-      var row = document.createElement('div');
-      row.className = 'kit-comp-row'; row.style.cssText = 'display:flex;gap:8px;margin-bottom:8px';
-      row.innerHTML = '<select class="kit-comp-select" style="flex:1;padding:10px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:14px">'+productOptions+'</select>'
-        + '<input type="number" class="kit-comp-qty" placeholder="Cant." min="1" value="1" style="width:70px;padding:10px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:14px">'
-        + '<button style="background:var(--red-bg);color:var(--red);border:none;border-radius:var(--r-sm);padding:0 10px;cursor:pointer;font-size:16px" onclick="this.parentElement.remove()">✕</button>';
-      document.getElementById('kitComponents').appendChild(row);
+  catWrap.querySelectorAll('.cat-pill').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      catWrap.querySelectorAll('.cat-pill').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      catalogActiveCategory = btn.dataset.cat;
+      renderCatalog();
     });
-    var save = document.getElementById('saveKitBtn');
-    if (save) save.addEventListener('click', function(){
-      var name = document.getElementById('kitName').value.trim();
-      var price = parseFloat(document.getElementById('kitPrice').value)||0;
-      if (!name||!price) { toast('Nombre y precio requeridos','warning'); return; }
-      var components = [];
-      document.querySelectorAll('.kit-comp-row').forEach(function(row){
-        var sel = row.querySelector('.kit-comp-select');
-        var qty = row.querySelector('.kit-comp-qty');
-        if (sel && qty) {
-          var p = state.products.find(function(x){ return x.id===sel.value; });
-          if (p) components.push({ productId:sel.value, productName:p.name, qty:parseInt(qty.value)||1 });
-        }
-      });
-      if (!components.length) { toast('Agrega al menos un componente','warning'); return; }
-      showLoading('Guardando...');
-      gasCall('createKit',{ name:name, salePrice:price, minStock:parseInt(document.getElementById('kitMinStock').value)||0, components:components })
-        .then(function(res){
-          if (res.success) { toast('Kit creado','success'); closeBottomSheet(); loadKitsSection(); logActivity('product','Kit creado: '+name); }
-          else toast(res.message||'Error','error');
-        }).finally(hideLoading);
-    });
-    var c = document.getElementById('cancelKitBtn');
-    if (c) c.addEventListener('click', closeBottomSheet);
-  }, 100);
+  });
+
+  renderCatalog();
 }
 
+function renderCatalog() {
+  var searchQ = document.getElementById('catSearch').value.toLowerCase();
+  var filtered = catalogProducts.filter(function(p){
+    var matchCat = catalogActiveCategory === 'all' || p.categoria === catalogActiveCategory;
+    var matchQ = !searchQ || p.nombre.toLowerCase().includes(searchQ);
+    return matchCat && matchQ;
+  });
 
-// ============ TODAY SALES HISTORY ============
-function getTodaySales() {
-  var key = 'stockapp_sales_' + new Date().toDateString();
-  try { return JSON.parse(localStorage.getItem(key)||'[]'); } catch(e){ return []; }
-}
-function saveTodaySales(arr) {
-  var key = 'stockapp_sales_' + new Date().toDateString();
-  try { localStorage.setItem(key, JSON.stringify(arr)); } catch(e){}
-}
-function showTodaySales() {
-  var sales = getTodaySales();
-  var total = sales.reduce(function(s,v){ return s+(v.total||0); }, 0);
-  var bodyHtml = '<div style="padding:4px 0 14px">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
-    +'<span style="font-size:13px;color:var(--text2);font-weight:600">'+sales.length+' ventas</span>'
-    +'<span style="font-family:var(--font);font-size:18px;font-weight:800;color:var(--green)">'+fmt(total)+'</span>'
-    +'</div>';
-  if (!sales.length) {
-    bodyHtml += '<div class="empty-state" style="padding:24px"><span>🛒</span><p>Sin ventas hoy</p></div>';
+  var body = document.getElementById('catalogBody');
+  if (!filtered.length) {
+    body.innerHTML = '<div class="cat-empty"><div class="cat-empty-icon">🔍</div><p>Sin productos</p></div>';
+    return;
+  }
+
+  // Group by category
+  var moneda = catalogSettings.moneda || 'CLP';
+  function fmtCat(n) {
+    try { return new Intl.NumberFormat('es-CL',{style:'currency',currency:moneda,maximumFractionDigits:moneda==='CLP'?0:2}).format(parseFloat(n)||0); }
+    catch(e){ return '$'+n; }
+  }
+
+  if (catalogActiveCategory !== 'all') {
+    body.innerHTML = '<div class="cat-grid">' + filtered.map(function(p){ return catCard(p, fmtCat); }).join('') + '</div>';
   } else {
-    bodyHtml += sales.map(function(s){
-      var cancelled = s.cancelled;
-      return '<div class="data-item" style="'+(cancelled?'opacity:0.4':'')+'">'
-        +'<div class="data-item-icon">🛒</div>'
-        +'<div class="data-item-info">'
-        +'<div class="data-item-title">'+(cancelled?'[ANULADA] ':'')+'#'+(s.id||'').toString().slice(-6)+'</div>'
-        +'<div class="data-item-subtitle">'+(s.date||'')+' · '+(s.payment||'')+'</div>'
-        +'</div>'
-        +'<div style="display:flex;align-items:center;gap:8px">'
-        +'<span style="font-family:var(--font);font-weight:800;color:'+(cancelled?'var(--text3)':'var(--green)')+'">'+fmt(s.total)+'</span>'
-        +(!cancelled?'<button class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:none;padding:6px 10px;border-radius:8px;font-size:12px" data-cancel-id="'+(s.id||'')+'">Anular</button>':'')
-        +'</div></div>';
+    var byCategory = {};
+    filtered.forEach(function(p){
+      var cat = p.categoria || 'General';
+      if (!byCategory[cat]) byCategory[cat] = [];
+      byCategory[cat].push(p);
+    });
+    body.innerHTML = Object.entries(byCategory).map(function(entry){
+      var cat = entry[0], prods = entry[1];
+      return '<div class="cat-section-title">'+cat+'</div>'
+        + '<div class="cat-grid">'+prods.map(function(p){ return catCard(p, fmtCat); }).join('')+'</div>';
     }).join('');
   }
-  bodyHtml += '</div>';
-  showBottomSheet('Ventas de Hoy', bodyHtml);
-  setTimeout(function(){
-    document.querySelectorAll('[data-cancel-id]').forEach(function(btn){
-      btn.addEventListener('click', function(){
-        var sid = this.getAttribute('data-cancel-id');
-        if (!confirm('Anular venta #'+sid+'?')) return;
-        showLoading('Anulando...');
-        gasCall('cancelSale',{ saleId: sid }).then(function(res){
-          if (res.success) {
-            var s2 = getTodaySales();
-            var found = s2.find(function(x){ return String(x.id)===String(sid); });
-            if (found) { found.cancelled=true; saveTodaySales(s2); }
-            toast('Venta anulada','success');
-            closeBottomSheet();
-          } else toast(res.message||'Error','error');
-        }).finally(hideLoading);
-      });
+
+  // Bind add buttons
+  body.querySelectorAll('.cat-card-add').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      addToCatalogCart(btn.dataset.pid, btn.dataset.name, parseFloat(btn.dataset.price)||0, btn.dataset.img||'');
     });
-  }, 150);
+  });
+  body.querySelectorAll('.cat-card').forEach(function(card){
+    card.addEventListener('click', function(){
+      var btn = card.querySelector('.cat-card-add');
+      if (btn) addToCatalogCart(btn.dataset.pid, btn.dataset.name, parseFloat(btn.dataset.price)||0, btn.dataset.img||'');
+    });
+  });
+  updateCatalogCartBadges();
 }
 
-// ============ EVENT BINDING ============
+function catCard(p, fmtFn) {
+  var inCart = catalogCart.find(function(i){ return i.id===p.id; });
+  return '<div class="cat-card" data-pid="'+p.id+'">'
+    +(inCart?'<div class="cat-card-in-cart">'+inCart.qty+'x</div>':'')
+    +'<div class="cat-card-img">'+(p.imagen_url?'<img src="'+p.imagen_url+'" style="width:100%;height:100%;object-fit:cover">':'📦')+'</div>'
+    +'<div class="cat-card-body">'
+    +'<div class="cat-card-name">'+p.nombre+'</div>'
+    +'<div class="cat-card-price">'+(fmtFn?fmtFn(p.precio_venta):('$'+p.precio_venta))+'</div>'
+    +'<div class="cat-card-stock">Stock: '+p.stock+'</div>'
+    +'</div>'
+    +'<button class="cat-card-add" data-pid="'+p.id+'" data-name="'+p.nombre+'" data-price="'+p.precio_venta+'" data-img="'+(p.imagen_url||'')+'">+</button>'
+    +'</div>';
+}
+
+function addToCatalogCart(pid, name, price, img) {
+  var idx = catalogCart.findIndex(function(i){ return i.id===pid; });
+  if (idx >= 0) catalogCart[idx].qty++;
+  else catalogCart.push({ id:pid, name:name, price:price, img:img, qty:1 });
+  updateCatalogFAB();
+  updateCatalogCartBadges();
+  // Flash feedback
+  var card = document.querySelector('.cat-card[data-pid="'+pid+'"]');
+  if (card) { card.style.borderColor = 'var(--accent)'; setTimeout(function(){ card.style.borderColor=''; }, 400); }
+}
+
+function updateCatalogFAB() {
+  var count = catalogCart.reduce(function(s,i){ return s+i.qty; }, 0);
+  var total = catalogCart.reduce(function(s,i){ return s+i.price*i.qty; }, 0);
+  var moneda = catalogSettings.moneda || 'CLP';
+  function fmtF(n) { try{ return new Intl.NumberFormat('es-CL',{style:'currency',currency:moneda,maximumFractionDigits:moneda==='CLP'?0:2}).format(n); }catch(e){return '$'+n;} }
+  document.getElementById('fabCount').textContent = count;
+  document.getElementById('fabTotal').textContent = fmtF(total);
+  document.getElementById('cartSheetTotal').textContent = fmtF(total);
+  var fab = document.getElementById('cartFab');
+  if (count > 0) fab.classList.remove('hidden');
+  else fab.classList.add('hidden');
+  renderCartSheet();
+}
+
+function updateCatalogCartBadges() {
+  document.querySelectorAll('.cat-card').forEach(function(card){
+    var pid = card.dataset.pid;
+    var item = catalogCart.find(function(i){ return i.id===pid; });
+    var badge = card.querySelector('.cat-card-in-cart');
+    if (item) {
+      if (!badge) {
+        badge = document.createElement('div');
+        badge.className = 'cat-card-in-cart';
+        card.appendChild(badge);
+      }
+      badge.textContent = item.qty + 'x';
+    } else if (badge) badge.remove();
+  });
+}
+
+function renderCartSheet() {
+  var el2 = document.getElementById('cartSheetItems');
+  if (!catalogCart.length) { el2.innerHTML = '<div class="cat-empty"><p>Sin productos</p></div>'; return; }
+  el2.innerHTML = catalogCart.map(function(item, idx){
+    return '<div class="cart-item-row">'
+      +'<div class="cart-item-img-sm">'+(item.img?'<img src="'+item.img+'" style="width:100%;height:100%;object-fit:cover">':'📦')+'</div>'
+      +'<div class="cart-item-info-col">'
+      +'<div class="cart-item-name-sm">'+item.name+'</div>'
+      +'<div class="cart-item-price-sm">'+fmtCatalog(item.price)+' c/u</div>'
+      +'</div>'
+      +'<div class="cart-item-qty-ctrl">'
+      +'<button class="qty-btn-sm" data-idx="'+idx+'" data-delta="-1">−</button>'
+      +'<span style="font-size:15px;font-weight:800;min-width:22px;text-align:center">'+item.qty+'</span>'
+      +'<button class="qty-btn-sm" data-idx="'+idx+'" data-delta="1">+</button>'
+      +'</div>'
+      +'<div style="font-family:var(--font);font-size:14px;font-weight:800;min-width:60px;text-align:right">'+fmtCatalog(item.price*item.qty)+'</div>'
+      +'</div>';
+  }).join('');
+  el2.querySelectorAll('.qty-btn-sm').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var idx = parseInt(btn.dataset.idx);
+      catalogCart[idx].qty += parseInt(btn.dataset.delta);
+      if (catalogCart[idx].qty <= 0) catalogCart.splice(idx,1);
+      updateCatalogFAB(); updateCatalogCartBadges();
+    });
+  });
+}
+
+function fmtCatalog(n) {
+  var moneda = catalogSettings.moneda || 'CLP';
+  try{ return new Intl.NumberFormat('es-CL',{style:'currency',currency:moneda,maximumFractionDigits:moneda==='CLP'?0:2}).format(parseFloat(n)||0); }
+  catch(e){ return '$'+n; }
+}
+
+function sendCatalogOrder() {
+  var name  = document.getElementById('orderName').value.trim();
+  var phone = document.getElementById('orderPhone').value.trim();
+  var notes = document.getElementById('orderNotes').value.trim();
+  if (!name)  { alert('Ingresa tu nombre'); return; }
+  if (!phone) { alert('Ingresa tu teléfono'); return; }
+  if (!catalogCart.length) { alert('Agrega productos al pedido'); return; }
+  var total = catalogCart.reduce(function(s,i){ return s+i.price*i.qty; }, 0);
+  var biz = catalogSettings.business_name || 'el negocio';
+  var sellerPhone = catalogSettings.telefono || '';
+  var lines = ['🛒 *Nuevo Pedido*', '🏪 Para: *'+biz+'*', ''];
+  lines.push('👤 '+name); lines.push('📞 '+phone); lines.push('');
+  lines.push('📦 *Productos:*');
+  catalogCart.forEach(function(i){ lines.push('  • '+i.qty+'x '+i.name+' — '+fmtCatalog(i.price*i.qty)); });
+  lines.push(''); lines.push('💰 *Total: '+fmtCatalog(total)+'*');
+  if (notes) lines.push('📝 '+notes);
+  lines.push(''); lines.push('_Pedido enviado desde el catálogo online_');
+  var msg = encodeURIComponent(lines.join('\n'));
+  var url = sellerPhone ? 'https://wa.me/'+sellerPhone.replace(/[^0-9]/g,'')+'?text='+msg : 'https://wa.me/?text='+msg;
+  window.open(url, '_blank');
+  // Save to history
+  saveOrderToHistory({ clientName:name, clientPhone:phone, notes:notes,
+    items:catalogCart.map(function(i){ return {name:i.name,qty:i.qty,price:i.price}; }), total:total });
+  // Thank you message
+  document.getElementById('cartSheetItems').innerHTML = '<div style="text-align:center;padding:30px"><div style="font-size:48px;margin-bottom:12px">🎉</div><p style="font-weight:700;font-size:16px">Pedido enviado!</p><p style="color:var(--text2);font-size:13px;margin-top:6px">El negocio lo recibirá en WhatsApp</p></div>';
+  document.getElementById('sendOrderBtn').style.display = 'none';
+  catalogCart = [];
+  updateCatalogFAB();
+  setTimeout(function(){ document.getElementById('cartSheet').classList.add('hidden'); document.getElementById('sendOrderBtn').style.display=''; }, 3000);
+}
+
+function bindCatalogEvents() {
+  document.getElementById('catSearch').addEventListener('input', renderCatalog);
+  document.getElementById('openCartBtn').addEventListener('click', function(){ document.getElementById('cartSheet').classList.remove('hidden'); });
+  document.getElementById('cartSheetOverlay').addEventListener('click', function(){ document.getElementById('cartSheet').classList.add('hidden'); });
+  document.getElementById('closeCartSheet').addEventListener('click', function(){ document.getElementById('cartSheet').classList.add('hidden'); });
+  document.getElementById('sendOrderBtn').addEventListener('click', sendCatalogOrder);
+}
+
+
+// ============ EVENT BINDING ============// ============ EVENT BINDING ============
 document.addEventListener('DOMContentLoaded', function() {
 
   // Login
@@ -3858,6 +3845,53 @@ document.addEventListener('DOMContentLoaded', function() {
   // Settings
   el('saveSettingsBtn').addEventListener('click', saveSettings);
 
+  // Appearance
+  var colorInput = document.getElementById('settingColor');
+  if (colorInput) {
+    colorInput.addEventListener('input', function(){
+      document.getElementById('colorPreviewLabel').textContent = this.value;
+    });
+  }
+  // Color presets
+  document.querySelectorAll('.color-preset').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var color = btn.dataset.color;
+      if (colorInput) { colorInput.value = color; document.getElementById('colorPreviewLabel').textContent = color; }
+      applyBranding({ colorPrimary: color });
+    });
+  });
+  // Save appearance
+  var saveAppearanceBtn = document.getElementById('saveAppearanceBtn');
+  if (saveAppearanceBtn) saveAppearanceBtn.addEventListener('click', function(){
+    var color = colorInput ? colorInput.value : '#6C63FF';
+    var logo  = document.getElementById('settingLogoUrl') ? document.getElementById('settingLogoUrl').value.trim() : '';
+    showLoading('Guardando...');
+    gasCall('saveSettings', Object.assign({}, state.settings, { colorPrimary: color, logoUrl: logo }))
+      .then(function(res){ if(res.success) toast('Apariencia guardada','success'); else toast('Error','error'); })
+      .finally(hideLoading);
+  });
+  // Apply logo preview
+  var applyLogoBtn = document.getElementById('applyLogoBtn');
+  if (applyLogoBtn) applyLogoBtn.addEventListener('click', function(){
+    var url = document.getElementById('settingLogoUrl').value.trim();
+    if (!url) return;
+    var img = document.getElementById('topLogoImg');
+    if (img) { img.src = url; img.style.display = 'block'; document.getElementById('logoPlaceholder').style.display = 'none'; }
+  });
+  // Save finance settings
+  var saveFinanceBtn = document.getElementById('saveFinanceBtn');
+  if (saveFinanceBtn) saveFinanceBtn.addEventListener('click', function(){
+    var methods = [];
+    document.querySelectorAll('.payment-toggle-item input:checked').forEach(function(cb){ methods.push(cb.value); });
+    showLoading('Guardando...');
+    gasCall('saveSettings', Object.assign({}, state.settings, {
+      moneda: el('settingMoneda').value,
+      impuesto: parseFloat(el('settingImpuesto').value)||0,
+      metodosPago: methods.join(',')
+    })).then(function(res){ if(res.success) toast('Configuración guardada','success'); else toast('Error','error'); })
+    .finally(hideLoading);
+  });
+
   // Desktop mode toggle
   var desktopToggle = document.getElementById('desktopModeToggle');
   if (desktopToggle) {
@@ -3964,8 +3998,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if(!e.target.closest('#purchaseProductSearch')&&!e.target.closest('#purchaseProductResults')) hidden('purchaseProductResults');
   });
 
-  // Order page
-  initOrderPage();
+  // Catalog page
+  initCatalogPage();
   var orderCheckoutBtn = document.getElementById('orderCheckoutBtn');
   if (orderCheckoutBtn) orderCheckoutBtn.addEventListener('click', function(){ document.getElementById('orderCheckout').classList.remove('hidden'); });
   var closeOC = document.getElementById('closeOrderCheckout');
