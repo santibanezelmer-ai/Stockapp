@@ -144,6 +144,10 @@ tr:hover td { background: var(--surface2); }
 
 .empty-state { text-align: center; padding: 40px; color: var(--text3); }
 .loading-row td { text-align: center; padding: 40px; color: var(--text2); }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
+.stats-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:18px; }
+.chart-section { }
+
 
 /* ── SUBSCRIPTION ── */
 .sub-active  { color: var(--green); font-weight: 700; }
@@ -157,6 +161,7 @@ tr:hover td { background: var(--surface2); }
 .sub-summary { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 14px; font-size: 13px; color: var(--text2); margin-top: 12px; line-height: 1.8; }
 .sub-summary strong { color: var(--text); }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -209,6 +214,26 @@ tr:hover td { background: var(--surface2); }
       <button class="btn-refresh" id="refreshBtn">↻ Actualizar</button>
     </div>
 
+    <!-- Growth Chart -->
+    <div class="stats-card chart-section" style="margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h2 style="font-family:var(--font);font-size:16px;font-weight:700">Crecimiento de Negocios</h2>
+        <div id="realtimeDot" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite"></span>
+          Tiempo real
+        </div>
+      </div>
+      <div style="height:200px;position:relative"><canvas id="growthChart"></canvas></div>
+    </div>
+
+    <!-- Expiry Alerts -->
+    <div id="expiryAlerts" class="hidden" style="margin-bottom:20px">
+      <div style="background:var(--yellow-bg);border:1px solid rgba(255,184,48,0.3);border-radius:var(--r-lg);padding:16px">
+        <h3 style="font-size:14px;font-weight:700;color:var(--yellow);margin-bottom:10px">⏰ Suscripciones por vencer</h3>
+        <div id="expiryList"></div>
+      </div>
+    </div>
+
     <!-- Table -->
     <div class="table-card">
       <div class="table-header">
@@ -225,6 +250,7 @@ tr:hover td { background: var(--surface2); }
               <th>Suscripción</th>
               <th>Vence</th>
               <th>Registro</th>
+              <th>Notas</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -451,6 +477,70 @@ async function loadNegocios() {
   applyFilter();
 }
 
+// ============ GROWTH CHART ============
+var adminChart = null;
+function renderGrowthChart() {
+  var ctx = document.getElementById('growthChart');
+  if (!ctx || !window.Chart) return;
+  if (adminChart) adminChart.destroy();
+  // Group registrations by month
+  var months = {};
+  state.negocios.forEach(function(n){
+    var m = n.created_at ? n.created_at.slice(0,7) : 'N/A';
+    months[m] = (months[m]||0)+1;
+  });
+  var labels = Object.keys(months).sort().slice(-12);
+  var data = labels.map(function(l){ return months[l]||0; });
+  // Cumulative
+  var cumData = [];
+  var cum = 0;
+  labels.forEach(function(l){ cum += months[l]||0; cumData.push(cum); });
+  adminChart = new Chart(ctx, {
+    type:'line',
+    data:{ labels:labels.map(function(l){ return l.slice(5)+'/'+l.slice(0,4); }),
+      datasets:[
+        { label:'Nuevos', data:data, backgroundColor:'rgba(108,99,255,0.15)', borderColor:'var(--accent)', tension:0.4, fill:true, borderWidth:2 },
+        { label:'Total', data:cumData, backgroundColor:'rgba(16,217,126,0.1)', borderColor:'var(--green)', tension:0.4, fill:false, borderWidth:2, yAxisID:'y2' }
+      ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:true, labels:{ color:'#8B92B0', boxWidth:12 } } },
+      scales:{ x:{ ticks:{ color:'#8B92B0' }, grid:{ color:'rgba(255,255,255,0.05)' } },
+        y:{ beginAtZero:true, ticks:{ color:'#8B92B0', stepSize:1 }, grid:{ color:'rgba(255,255,255,0.05)' } },
+        y2:{ position:'right', beginAtZero:true, ticks:{ color:'#8B92B0' }, grid:{ display:false } } } }
+  });
+}
+
+// ============ EXPIRY ALERTS ============
+function checkExpiryAlerts() {
+  var expiring = state.negocios.filter(function(n){
+    if (!n.suscripcion_fin) return false;
+    var days = Math.ceil((new Date(n.suscripcion_fin)-new Date())/(1000*60*60*24));
+    return days >= 0 && days <= 7;
+  });
+  var alertsEl = document.getElementById('expiryAlerts');
+  var listEl = document.getElementById('expiryList');
+  if (!expiring.length) { if(alertsEl) alertsEl.classList.add('hidden'); return; }
+  if(alertsEl) alertsEl.classList.remove('hidden');
+  if(listEl) listEl.innerHTML = expiring.map(function(n){
+    var days = Math.ceil((new Date(n.suscripcion_fin)-new Date())/(1000*60*60*24));
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,184,48,0.15)">'
+      +'<div><strong>'+esc(n.nombre)+'</strong><div style="font-size:12px;color:var(--text2)">'+esc(n.email)+'</div></div>'
+      +'<div style="text-align:right">'
+      +'<div style="font-weight:700;color:var(--yellow)">'+days+' día(s)</div>'
+      +'<button class="btn-sm btn-paid" data-id="'+n.id+'" data-name="'+esc(n.nombre)+'" data-inicio="'+(n.suscripcion_inicio||'')+'" data-fin="'+(n.suscripcion_fin||'')+'" data-meses="'+(n.suscripcion_meses||1)+'" data-plan="'+n.plan+'" data-action="sub" style="font-size:11px;margin-top:4px">Renovar</button>'
+      +'</div></div>';
+  }).join('');
+}
+
+// ============ REALTIME REFRESH ============
+var realtimeInterval = null;
+function startRealtime() {
+  if (realtimeInterval) clearInterval(realtimeInterval);
+  realtimeInterval = setInterval(function(){
+    loadNegocios();
+  }, 30000); // refresh every 30s
+}
+
 function updateStats() {
   var n = state.negocios;
   var expiring = n.filter(function(x){
@@ -476,6 +566,9 @@ function applyFilter() {
     return matchPlan && matchQ;
   });
   renderTable();
+  renderGrowthChart();
+  checkExpiryAlerts();
+  startRealtime();
 }
 
 function renderTable() {
@@ -500,6 +593,7 @@ function renderTable() {
       + '<td><span class="'+subStatus.cls+'">'+subStatus.label+'</span></td>'
       + '<td style="color:var(--text2)">'+(n.suscripcion_fin ? fmtDate(n.suscripcion_fin) : '—')+'</td>'
       + '<td style="color:var(--text2)">'+fmtDate(n.created_at)+'</td>'
+      + '<td style="color:var(--text3);font-size:12px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(getNoteFor(n.id)||'—')+'</td>'
       + '<td><div class="actions">'
       + '<button class="btn-sm '+(isBlocked?'btn-unblock':'btn-block')+'" data-id="'+n.id+'" data-action="'+(isBlocked?'unblock':'block')+'">'+(isBlocked?'✅ Desbloquear':'🚫 Bloquear')+'</button>'
       + '<button class="btn-sm btn-paid" data-id="'+n.id+'" data-name="'+esc(n.nombre)+'" data-inicio="'+(n.suscripcion_inicio||'')+'" data-fin="'+(n.suscripcion_fin||'')+'" data-meses="'+(n.suscripcion_meses||1)+'" data-plan="'+plan+'" data-action="sub">📅 Suscripción</button>'
