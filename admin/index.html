@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OperixERP — Panel Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0F1117; --bg2: #181B23; --surface: #242838; --surface2: #2C3145;
+  --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12);
+  --text: #F0F2FF; --text2: #8B92B0; --text3: #5A6080;
+  --accent: #6C63FF; --accent2: #8B85FF; --accent-glow: rgba(108,99,255,0.25);
+  --green: #10D97E; --green-bg: rgba(16,217,126,0.1);
+  --red: #FF5271; --red-bg: rgba(255,82,113,0.1);
+  --yellow: #FFB830; --yellow-bg: rgba(255,184,48,0.1);
+  --blue: #38BFFF; --blue-bg: rgba(56,191,255,0.1);
+  --font: 'Sora', sans-serif; --font2: 'DM Sans', sans-serif;
+  --r: 12px; --r-lg: 16px; --r-xl: 20px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font2); background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+
+/* ── LOGIN ── */
+#loginScreen {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 24px; background: var(--bg);
+}
+#loginScreen::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(108,99,255,0.15) 0%, transparent 70%);
+}
+.login-box {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: var(--r-xl); padding: 36px 32px; width: 100%; max-width: 380px;
+  position: relative; z-index: 1; box-shadow: var(--shadow);
+}
+.login-logo { text-align: center; margin-bottom: 28px; }
+.login-logo h1 { font-family: var(--font); font-size: 24px; font-weight: 800; }
+.login-logo p { font-size: 13px; color: var(--text2); margin-top: 4px; }
+.login-logo .badge {
+  display: inline-block; background: var(--accent-glow); color: var(--accent2);
+  border: 1px solid var(--accent); border-radius: 100px; padding: 3px 12px;
+  font-size: 11px; font-weight: 700; margin-top: 8px; text-transform: uppercase; letter-spacing: 1px;
+}
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 7px; }
+.form-group input { width: 100%; padding: 12px 16px; background: var(--bg2); border: 1.5px solid var(--border); border-radius: var(--r); color: var(--text); font-family: var(--font2); font-size: 15px; outline: none; transition: border-color 0.2s; }
+.form-group input:focus { border-color: var(--accent); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 12px 20px; border-radius: var(--r); border: none; font-family: var(--font2); font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.18s; }
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: linear-gradient(135deg, var(--accent), #5B52EE); color: white; width: 100%; padding: 14px; }
+.btn-lg { font-size: 15px; padding: 14px 20px; }
+.error-msg { background: var(--red-bg); color: var(--red); border: 1px solid rgba(255,82,113,0.2); border-radius: var(--r); padding: 10px 14px; font-size: 13px; margin-bottom: 14px; }
+.hidden { display: none !important; }
+
+/* ── DASHBOARD ── */
+#dashScreen { display: none; min-height: 100vh; flex-direction: column; }
+#dashScreen.active { display: flex; }
+
+.topbar {
+  height: 58px; background: var(--bg2); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px; flex-shrink: 0; position: sticky; top: 0; z-index: 100;
+}
+.topbar-brand { display: flex; align-items: center; gap: 10px; }
+.topbar-brand .icon { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--blue)); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.topbar-brand h1 { font-family: var(--font); font-size: 16px; font-weight: 800; }
+.topbar-brand .admin-badge { background: var(--accent-glow); color: var(--accent2); border: 1px solid var(--accent); border-radius: 100px; padding: 2px 10px; font-size: 11px; font-weight: 700; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.topbar-right span { font-size: 13px; color: var(--text2); }
+.btn-logout { background: var(--red-bg); color: var(--red); border: 1px solid rgba(255,82,113,0.2); padding: 7px 14px; border-radius: var(--r); font-size: 13px; font-weight: 600; cursor: pointer; }
+
+.main { flex: 1; padding: 28px 24px; max-width: 1200px; margin: 0 auto; width: 100%; }
+
+/* ── STATS ── */
+.stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 28px; }
+@media(max-width:768px){ .stats-grid { grid-template-columns: 1fr 1fr; } }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 18px; }
+.stat-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; margin-bottom: 8px; }
+.stat-value { font-family: var(--font); font-size: 26px; font-weight: 800; }
+.stat-value.blue { color: var(--blue); }
+.stat-value.green { color: var(--green); }
+.stat-value.yellow { color: var(--yellow); }
+.stat-value.red { color: var(--red); }
+
+/* ── TOOLBAR ── */
+.toolbar { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
+.search-input { flex: 1; min-width: 200px; padding: 10px 16px; background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--r); color: var(--text); font-family: var(--font2); font-size: 14px; outline: none; transition: border-color 0.2s; }
+.search-input:focus { border-color: var(--accent); }
+.filter-btn { padding: 10px 16px; background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--r); color: var(--text2); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.filter-btn.active { background: var(--accent-glow); border-color: var(--accent); color: var(--accent2); }
+.btn-refresh { padding: 10px 16px; background: var(--surface2); border: none; border-radius: var(--r); color: var(--text2); font-size: 14px; cursor: pointer; }
+
+/* ── TABLE ── */
+.table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; }
+.table-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.table-header h2 { font-family: var(--font); font-size: 16px; font-weight: 700; }
+.table-count { font-size: 12px; color: var(--text2); background: var(--surface2); padding: 3px 10px; border-radius: 100px; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th { padding: 11px 16px; text-align: left; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 14px 16px; font-size: 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--surface2); }
+
+/* ── BADGES ── */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; }
+.badge-free { background: var(--blue-bg); color: var(--blue); }
+.badge-paid { background: var(--green-bg); color: var(--green); }
+.badge-blocked { background: var(--red-bg); color: var(--red); }
+.badge-trial { background: var(--yellow-bg); color: var(--yellow); }
+
+/* ── ACTION BUTTONS ── */
+.actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; font-family: var(--font2); font-weight: 600; transition: all 0.15s; }
+.btn-sm:active { transform: scale(0.95); }
+.btn-block { background: var(--red-bg); color: var(--red); }
+.btn-unblock { background: var(--green-bg); color: var(--green); }
+.btn-paid { background: var(--accent-glow); color: var(--accent2); }
+.btn-free { background: var(--blue-bg); color: var(--blue); }
+.btn-msg { background: var(--surface2); color: var(--text2); }
+.btn-trial { background: var(--yellow-bg); color: var(--yellow); }
+
+/* ── MODAL ── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
+.modal-overlay.hidden { display: none !important; }
+.modal-box { background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--r-xl); width: 100%; max-width: 480px; box-shadow: var(--shadow); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--border); }
+.modal-header h3 { font-family: var(--font); font-size: 17px; font-weight: 700; }
+.modal-close { background: var(--surface2); border: none; color: var(--text2); width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+.modal-body { padding: 20px; }
+.modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+.modal-footer .btn { flex: none; padding: 10px 20px; }
+.btn-outline { background: transparent; color: var(--text); border: 1.5px solid var(--border2); }
+
+/* ── TOAST ── */
+.toast-container { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
+.toast { background: var(--surface); border: 1px solid var(--border2); color: var(--text); padding: 11px 20px; border-radius: 100px; font-size: 14px; font-weight: 600; box-shadow: var(--shadow); animation: toastIn 0.25s ease; white-space: nowrap; }
+.toast.success { background: var(--green-bg); border-color: rgba(16,217,126,0.2); color: var(--green); }
+.toast.error { background: var(--red-bg); border-color: rgba(255,82,113,0.2); color: var(--red); }
+@keyframes toastIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+
+.empty-state { text-align: center; padding: 40px; color: var(--text3); }
+.loading-row td { text-align: center; padding: 40px; color: var(--text2); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">
+      <h1>⚙️ OperixERP</h1>
+      <p>Panel de Administración</p>
+      <span class="badge">Super Admin</span>
+    </div>
+    <div id="loginError" class="error-msg hidden"></div>
+    <div class="form-group"><label>Email</label><input type="email" id="adminEmail" placeholder="admin@operixerp.cloud"></div>
+    <div class="form-group"><label>Contraseña</label><input type="password" id="adminPass" placeholder="••••••••"></div>
+    <button class="btn btn-primary btn-lg" id="loginBtn">Ingresar al panel</button>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashScreen">
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="icon">⚙️</div>
+      <h1>OperixERP</h1>
+      <span class="admin-badge">Admin</span>
+    </div>
+    <div class="topbar-right">
+      <span id="adminName"></span>
+      <button class="btn-logout" id="logoutBtn">Salir</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Total negocios</div><div class="stat-value blue" id="statTotal">0</div></div>
+      <div class="stat-card"><div class="stat-label">Planes pagados</div><div class="stat-value green" id="statPaid">0</div></div>
+      <div class="stat-card"><div class="stat-label">Plan free</div><div class="stat-value yellow" id="statFree">0</div></div>
+      <div class="stat-card"><div class="stat-label">Bloqueados</div><div class="stat-value red" id="statBlocked">0</div></div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <input type="text" class="search-input" id="searchInput" placeholder="🔍 Buscar por nombre o email...">
+      <button class="filter-btn active" data-filter="all">Todos</button>
+      <button class="filter-btn" data-filter="free">Free</button>
+      <button class="filter-btn" data-filter="paid">Pagados</button>
+      <button class="filter-btn" data-filter="blocked">Bloqueados</button>
+      <button class="btn-refresh" id="refreshBtn">↻ Actualizar</button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-card">
+      <div class="table-header">
+        <h2>Negocios registrados</h2>
+        <span class="table-count" id="tableCount">0 negocios</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Negocio</th>
+              <th>Email</th>
+              <th>Plan</th>
+              <th>Registro</th>
+              <th>Último acceso</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr class="loading-row"><td colspan="6">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MENSAJE -->
+<div class="modal-overlay hidden" id="msgModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>📩 Enviar mensaje a <span id="msgBizName"></span></h3>
+      <button class="modal-close" id="closeMsgModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="msgBizId">
+      <input type="hidden" id="msgBizEmail">
+      <div class="form-group">
+        <label>Mensaje</label>
+        <textarea id="msgText" rows="4" style="width:100%;padding:12px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font2);font-size:14px;outline:none;resize:vertical" placeholder="Escribe tu mensaje..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Nota interna (solo visible aquí)</label>
+        <input type="text" id="msgNote" placeholder="Ej: Cliente VIP, pagó el 15/03...">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" id="cancelMsgBtn">Cancelar</button>
+      <button class="btn btn-primary" id="sendMsgBtn" style="width:auto">📲 Enviar por WhatsApp</button>
+      <button class="btn" style="background:var(--green-bg);color:var(--green);width:auto" id="saveNoteBtn">💾 Guardar nota</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CAMBIAR PLAN -->
+<div class="modal-overlay hidden" id="planModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Cambiar plan — <span id="planBizName"></span></h3>
+      <button class="modal-close" id="closePlanModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="planBizId">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
+        <button class="btn-sm btn-free" style="padding:14px;border-radius:12px;font-size:14px" data-plan="free">🆓 Free</button>
+        <button class="btn-sm btn-trial" style="padding:14px;border-radius:12px;font-size:14px" data-plan="trial">⏳ Trial</button>
+        <button class="btn-sm btn-paid" style="padding:14px;border-radius:12px;font-size:14px" data-plan="paid">💎 Pagado</button>
+        <button class="btn-sm btn-block" style="padding:14px;border-radius:12px;font-size:14px" data-plan="blocked">🚫 Bloqueado</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+const SUPABASE_URL = 'https://ebekmlhdrxtloghftbga.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImViZWttbGhkcnh0bG9naGZ0YmdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3MDc2MjYsImV4cCI6MjA4OTI4MzYyNn0.4T9tYw4neBd6-LYnVV9hLhBUVMqfhQomuqGuf_jHyos';
+
+// ── ADMIN CREDENTIALS (change these) ──
+const ADMIN_EMAIL = 'admin@operixerp.cloud';
+const ADMIN_PASS  = 'OperixAdmin2025!';
+
+var state = { negocios: [], filtered: [], currentFilter: 'all' };
+
+// ── UTILS ──
+function toast(msg, type, dur) {
+  var c = document.getElementById('toastContainer');
+  var t = document.createElement('div');
+  t.className = 'toast ' + (type||'');
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(function(){ t.remove(); }, dur||2800);
+}
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function el(id) { return document.getElementById(id); }
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric' });
+}
+
+// ── API ──
+async function sbFetch(path, options) {
+  options = options || {};
+  var res = await fetch(SUPABASE_URL + path, Object.assign({}, options, {
+    headers: Object.assign({
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Prefer': 'return=representation'
+    }, options.headers || {})
+  }));
+  var text = await res.text();
+  try { return { ok: res.ok, status: res.status, data: JSON.parse(text) }; }
+  catch(e) { return { ok: res.ok, status: res.status, data: text }; }
+}
+
+// ── AUTH ──
+function doLogin() {
+  var email = el('adminEmail').value.trim();
+  var pass  = el('adminPass').value.trim();
+  if (email !== ADMIN_EMAIL || pass !== ADMIN_PASS) {
+    el('loginError').textContent = 'Credenciales incorrectas';
+    el('loginError').classList.remove('hidden');
+    return;
+  }
+  sessionStorage.setItem('operix_admin', '1');
+  el('adminName').textContent = email;
+  el('loginScreen').style.display = 'none';
+  el('dashScreen').classList.add('active');
+  loadNegocios();
+}
+function doLogout() {
+  sessionStorage.removeItem('operix_admin');
+  el('dashScreen').classList.remove('active');
+  el('loginScreen').style.display = 'flex';
+}
+
+// ── LOAD DATA ──
+async function loadNegocios() {
+  el('tableBody').innerHTML = '<tr class="loading-row"><td colspan="6">Cargando...</td></tr>';
+  var res = await sbFetch('/rest/v1/negocios?order=created_at.desc&select=*');
+  if (!res.ok) { toast('Error cargando datos','error'); return; }
+
+  // Get last login for each negocio from usuarios
+  var users = await sbFetch('/rest/v1/usuarios?select=negocio_id,created_at&order=created_at.desc');
+  var lastAccess = {};
+  (users.data || []).forEach(function(u){
+    if (!lastAccess[u.negocio_id]) lastAccess[u.negocio_id] = u.created_at;
+  });
+
+  state.negocios = (res.data || []).map(function(n){
+    return Object.assign({}, n, { lastAccess: lastAccess[n.id] || null });
+  });
+
+  updateStats();
+  applyFilter();
+}
+
+function updateStats() {
+  var n = state.negocios;
+  el('statTotal').textContent   = n.length;
+  el('statPaid').textContent    = n.filter(function(x){ return x.plan==='paid'; }).length;
+  el('statFree').textContent    = n.filter(function(x){ return x.plan==='free'||x.plan==='trial'; }).length;
+  el('statBlocked').textContent = n.filter(function(x){ return x.plan==='blocked'; }).length;
+}
+
+function applyFilter() {
+  var q = el('searchInput').value.toLowerCase();
+  var f = state.currentFilter;
+  state.filtered = state.negocios.filter(function(n){
+    var matchPlan = f === 'all' || n.plan === f;
+    var matchQ = !q || (n.nombre||'').toLowerCase().includes(q) || (n.email||'').toLowerCase().includes(q);
+    return matchPlan && matchQ;
+  });
+  renderTable();
+}
+
+function renderTable() {
+  var tbody = el('tableBody');
+  el('tableCount').textContent = state.filtered.length + ' negocios';
+  if (!state.filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text3)">Sin resultados</td></tr>';
+    return;
+  }
+  var planBadge = { free:'badge-free', paid:'badge-paid', blocked:'badge-blocked', trial:'badge-trial' };
+  var planLabel = { free:'Free', paid:'💎 Pagado', blocked:'🚫 Bloqueado', trial:'⏳ Trial' };
+  tbody.innerHTML = state.filtered.map(function(n){
+    var plan = n.plan || 'free';
+    var isBlocked = plan === 'blocked';
+    return '<tr>'
+      + '<td><strong style="font-size:14px">'+esc(n.nombre)+'</strong></td>'
+      + '<td style="color:var(--text2)">'+esc(n.email)+'</td>'
+      + '<td><span class="badge '+(planBadge[plan]||'badge-free')+'">'+(planLabel[plan]||plan)+'</span></td>'
+      + '<td style="color:var(--text2)">'+fmtDate(n.created_at)+'</td>'
+      + '<td style="color:var(--text2)">'+fmtDate(n.lastAccess)+'</td>'
+      + '<td><div class="actions">'
+      + '<button class="btn-sm '+(isBlocked?'btn-unblock':'btn-block')+'" data-id="'+n.id+'" data-action="'+(isBlocked?'unblock':'block')+'">'+(isBlocked?'✅ Desbloquear':'🚫 Bloquear')+'</button>'
+      + '<button class="btn-sm btn-paid" data-id="'+n.id+'" data-name="'+esc(n.nombre)+'" data-action="plan">💳 Plan</button>'
+      + '<button class="btn-sm btn-msg" data-id="'+n.id+'" data-name="'+esc(n.nombre)+'" data-email="'+esc(n.email||'')+'" data-action="msg">📩 Mensaje</button>'
+      + '</div></td>'
+      + '</tr>';
+  }).join('');
+}
+
+// ── ACTIONS ──
+async function blockNegocio(id, block) {
+  var plan = block ? 'blocked' : 'free';
+  var res = await sbFetch('/rest/v1/negocios?id=eq.' + id, {
+    method: 'PATCH', body: JSON.stringify({ plan: plan })
+  });
+  if (res.ok) {
+    var n = state.negocios.find(function(x){ return x.id===id; });
+    if (n) n.plan = plan;
+    updateStats(); applyFilter();
+    toast(block ? 'Negocio bloqueado' : 'Negocio desbloqueado', block ? 'error' : 'success');
+  } else toast('Error al actualizar','error');
+}
+
+async function changePlan(id, plan) {
+  var res = await sbFetch('/rest/v1/negocios?id=eq.' + id, {
+    method: 'PATCH', body: JSON.stringify({ plan: plan })
+  });
+  if (res.ok) {
+    var n = state.negocios.find(function(x){ return x.id===id; });
+    if (n) n.plan = plan;
+    updateStats(); applyFilter();
+    el('planModal').classList.add('hidden');
+    toast('Plan actualizado a: ' + plan, 'success');
+  } else toast('Error','error');
+}
+
+async function saveNote(id, note) {
+  // Store note in negocios table (reuse a field or add notes column)
+  // For now store in localStorage indexed by negocio_id
+  var notes = JSON.parse(localStorage.getItem('admin_notes')||'{}');
+  notes[id] = note;
+  localStorage.setItem('admin_notes', JSON.stringify(notes));
+  toast('Nota guardada','success');
+  el('msgModal').classList.add('hidden');
+}
+
+function getNoteFor(id) {
+  var notes = JSON.parse(localStorage.getItem('admin_notes')||'{}');
+  return notes[id] || '';
+}
+
+// ── EVENT BINDING ──
+document.addEventListener('DOMContentLoaded', function(){
+  // Session restore
+  if (sessionStorage.getItem('operix_admin') === '1') {
+    el('loginScreen').style.display = 'none';
+    el('dashScreen').classList.add('active');
+    loadNegocios();
+  }
+
+  // Login
+  el('loginBtn').addEventListener('click', doLogin);
+  el('adminPass').addEventListener('keypress', function(e){ if(e.key==='Enter') doLogin(); });
+  el('adminEmail').addEventListener('keypress', function(e){ if(e.key==='Enter') doLogin(); });
+  el('logoutBtn').addEventListener('click', doLogout);
+
+  // Search + filter
+  el('searchInput').addEventListener('input', applyFilter);
+  el('refreshBtn').addEventListener('click', loadNegocios);
+  document.querySelectorAll('.filter-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      state.currentFilter = btn.dataset.filter;
+      applyFilter();
+    });
+  });
+
+  // Table actions (delegation)
+  el('tableBody').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var action = btn.dataset.action;
+    var id = btn.dataset.id;
+    if (action === 'block')   blockNegocio(id, true);
+    if (action === 'unblock') blockNegocio(id, false);
+    if (action === 'plan') {
+      el('planBizId').value = id;
+      el('planBizName').textContent = btn.dataset.name || '';
+      el('planModal').classList.remove('hidden');
+    }
+    if (action === 'msg') {
+      el('msgBizId').value = id;
+      el('msgBizEmail').value = btn.dataset.email || '';
+      el('msgBizName').textContent = btn.dataset.name || '';
+      el('msgText').value = '';
+      el('msgNote').value = getNoteFor(id);
+      el('msgModal').classList.remove('hidden');
+    }
+  });
+
+  // Plan modal
+  el('closePlanModal').addEventListener('click', function(){ el('planModal').classList.add('hidden'); });
+  el('planModal').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-plan]');
+    if (btn) changePlan(el('planBizId').value, btn.dataset.plan);
+  });
+  el('planModal').querySelector('.modal-overlay-bg') && el('planModal').addEventListener('click', function(e){
+    if (e.target === el('planModal')) el('planModal').classList.add('hidden');
+  });
+
+  // Msg modal
+  el('closeMsgModal').addEventListener('click', function(){ el('msgModal').classList.add('hidden'); });
+  el('cancelMsgBtn').addEventListener('click', function(){ el('msgModal').classList.add('hidden'); });
+  el('saveNoteBtn').addEventListener('click', function(){
+    saveNote(el('msgBizId').value, el('msgNote').value);
+  });
+  el('sendMsgBtn').addEventListener('click', function(){
+    var email = el('msgBizEmail').value;
+    var msg = el('msgText').value.trim();
+    if (!msg) { toast('Escribe un mensaje primero','error'); return; }
+    // Open WhatsApp - need phone number; fallback to email if no phone
+    var waMsg = encodeURIComponent(msg);
+    window.open('https://wa.me/?text=' + waMsg, '_blank');
+    // Save note too
+    if (el('msgNote').value) saveNote(el('msgBizId').value, el('msgNote').value);
+    el('msgModal').classList.add('hidden');
+    toast('WhatsApp abierto','success');
+  });
+});
+</script>
+</body>
+</html>
