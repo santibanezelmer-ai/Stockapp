@@ -4331,8 +4331,11 @@ document.addEventListener('DOMContentLoaded', function() {
   if (desktopToggle) {
     desktopToggle.checked = localStorage.getItem('stockapp_layout') === 'desktop';
     desktopToggle.addEventListener('change', function(){
-      applyLayout(this.checked ? 'desktop' : 'mobile');
-      toast(this.checked ? 'Modo escritorio activado' : 'Modo móvil activado', 'success');
+      var mode = this.checked ? 'desktop' : 'mobile';
+      localStorage.setItem('stockapp_layout', mode);
+      toast((mode==='desktop'?'Modo escritorio':'Modo movil')+' activado — recargando...', 'success', 1500);
+      // Reload after short delay so toast is visible
+      setTimeout(function(){ window.location.reload(); }, 1000);
     });
   }
 
@@ -4551,6 +4554,8 @@ document.addEventListener('DOMContentLoaded', function() {
   checkOnline();
   // Session restore (skip in catalog mode)
   if (window._showCatalog) return;
+  // Apply layout BEFORE showing app so sidebar is ready
+  initLayout();
   var saved = sessionStorage.getItem('stockapp_user');
   if(saved){ try{ state.currentUser=JSON.parse(saved); showApp(); }catch(e){ sessionStorage.removeItem('stockapp_user'); } }
 });
