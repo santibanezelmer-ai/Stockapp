@@ -1558,6 +1558,12 @@ async function apiLogin({ user, pass }) {
   const u = res.data[0];
   if (!u.negocio_id) return { success: false, message: 'Usuario sin negocio asignado' };
 
+  // Check if negocio is blocked
+  const negCheck = await sbFetch('/rest/v1/negocios?id=eq.' + u.negocio_id + '&select=plan,nombre');
+  if (negCheck.data && negCheck.data[0] && negCheck.data[0].plan === 'blocked') {
+    return { success: false, message: 'Tu cuenta ha sido suspendida. Contacta a soporte en operixerp.cloud' };
+  }
+
   // Step 2: get negocio name
   const neg = await sbFetch('/rest/v1/negocios?id=eq.' + u.negocio_id + '&select=nombre');
   const bizName = (neg.data && neg.data[0]) ? neg.data[0].nombre : '';
