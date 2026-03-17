@@ -73,13 +73,36 @@ html, body {
 ══════════════════════════════ */
 #loginScreen {
   background: var(--bg);
-  align-items: flex-start; justify-content: center; padding: 40px 24px;
+  align-items: center; justify-content: center; padding: 24px;
   overflow-y: auto;
 }
 #loginScreen::before {
   content: ''; position: fixed; inset: 0; pointer-events: none;
-  background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(108,99,255,0.18) 0%, transparent 70%),
-              radial-gradient(ellipse 50% 40% at 100% 80%, rgba(56,191,255,0.10) 0%, transparent 60%);
+  background: 
+    radial-gradient(ellipse 70% 50% at 20% 20%, rgba(108,99,255,0.15) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(56,191,255,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 50% 50%, rgba(16,217,126,0.05) 0%, transparent 70%);
+  animation: bgPulse 8s ease-in-out infinite alternate;
+}
+@keyframes bgPulse {
+  from { opacity: 0.6; }
+  to   { opacity: 1; }
+}
+.login-container { animation: loginFadeIn 0.5s cubic-bezier(.32,.72,0,1); }
+@keyframes loginFadeIn {
+  from { opacity:0; transform: translateY(24px); }
+  to   { opacity:1; transform: none; }
+}
+.logo-icon {
+  width: 80px; height: 80px; border-radius: 24px; margin: 0 auto 16px;
+  background: linear-gradient(135deg, var(--accent), var(--blue));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 40px; box-shadow: 0 8px 32px var(--accent-glow);
+  animation: logoFloat 3s ease-in-out infinite;
+}
+@keyframes logoFloat {
+  0%,100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
 }
 .login-container { position: relative; width: 100%; max-width: 380px; z-index: 1; }
 .login-logo { text-align: center; margin-bottom: 36px; }
@@ -874,6 +897,43 @@ body.desktop-mode .bottom-nav { display: none !important; }
 body.desktop-mode .more-drawer { display: none !important; }
 body.desktop-mode .toast-container { bottom: 20px; left: 50%; transform: translateX(-50%); }
 
+
+/* ── QUICK SALE ── */
+.cart-badge { transition: transform 0.2s, background 0.2s; }
+.search-bar input { font-size: 16px; }  /* prevent zoom on iOS */
+.product-grid-card:active { transform: scale(0.95); }
+.product-list-item:active { transform: scale(0.98); }
+
+/* ── IMPROVED SEARCH ── */
+.search-highlight { background: var(--accent-glow); border-radius: 3px; }
+.no-results-hint { text-align:center; padding:20px; color:var(--text3); font-size:13px; }
+
+
+/* ══════════════════════════════
+   CATALOG IMPROVED
+══════════════════════════════ */
+.cat-card { box-shadow: var(--shadow-sm); transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s; }
+.cat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.cat-card-img { background: linear-gradient(135deg, var(--bg3), var(--surface)); }
+.cat-card-price { color: var(--accent2); }
+.cat-empty-banner { text-align:center; padding:60px 20px; }
+.cat-empty-banner .cat-empty-icon { font-size:64px; margin-bottom:16px; }
+.cat-empty-banner h2 { font-family:var(--font); font-size:22px; font-weight:800; margin-bottom:8px; }
+.cat-empty-banner p { font-size:14px; color:var(--text2); }
+
+/* Cart sheet improvements */
+.bottom-sheet-body { padding-bottom: 40px; }
+.order-send-section { background:var(--surface); border-radius:var(--r-lg); padding:16px; margin-top:14px; }
+.order-send-section .form-group { margin-bottom:12px; }
+
+/* Category pills scroll indicator */
+.cat-filter-wrap { position:relative; }
+.cat-filter-wrap::after { 
+  content:''; position:absolute; right:0; top:0; bottom:12px; width:24px;
+  background:linear-gradient(to right, transparent, var(--bg2));
+  pointer-events:none;
+}
+
 </style>
 </head>
 <body>
@@ -1201,11 +1261,18 @@ body.desktop-mode .toast-container { bottom: 20px; left: 50%; transform: transla
     <section id="sec-inventory" class="section hidden">
       <div class="section-header">
         <h2>Inventario</h2>
-        <button id="addProductBtn" class="btn btn-sm btn-primary">+ Agregar</button>
+        <div style="display:flex;gap:8px">
+          <span id="inventoryCount" style="font-size:12px;color:var(--text2);align-self:center"></span>
+          <button id="addProductBtn" class="btn btn-sm btn-primary">+ Agregar</button>
+        </div>
       </div>
-      <div class="search-bar">
-        <input type="text" id="inventorySearch" placeholder="🔍 Buscar producto...">
-        <select id="categoryFilter"><option value="">Todas las categorías</option></select>
+      <div class="search-bar" style="margin-bottom:8px">
+        <input type="text" id="inventorySearch" placeholder="🔍 Buscar por nombre o código...">
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;overflow-x:auto">
+        <select id="categoryFilter" style="padding:8px 12px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px"><option value="">Todas las categorías</option></select>
+        <button id="stockFilterBtn" class="filter-btn" style="white-space:nowrap;padding:8px 14px;border-radius:var(--r);border:1.5px solid var(--border);background:var(--surface);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer">⚠ Stock bajo</button>
+        <button id="sortPriceBtn" class="filter-btn" style="white-space:nowrap;padding:8px 14px;border-radius:var(--r);border:1.5px solid var(--border);background:var(--surface);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer">💰 Precio</button>
       </div>
       <div id="productFormModal" class="modal hidden">
         <div class="modal-overlay" id="productModalOverlay"></div>
@@ -2593,6 +2660,8 @@ function showApp() {
   applyRoleUI();
   logActivity('login','Inicio de sesion: '+(u.name||''));
   initAutoBackup();
+  // Check overdue debts after 3 seconds
+  setTimeout(checkOverdueDebts, 3000);
 }
 function showSection(name) {
   document.querySelectorAll('.section').forEach(function(s){
@@ -2857,7 +2926,17 @@ function addToCart(pid) {
     state.cart.push({ id:p.id, name:p.name, salePrice:parseFloat(p.salePrice)||0, costPrice:parseFloat(p.costPrice)||0, imageUrl:p.imageUrl||'', qty:1, stock:parseInt(p.stock)||0 });
   }
   hidden('searchResults'); el('productSearch').value = '';
-  renderCart(); toast(p.name+' agregado','success',1500);
+  renderCart();
+  // Quick feedback — flash the cart badge
+  var badge = el('cartCount');
+  if (badge) {
+    badge.style.transform = 'scale(1.4)';
+    badge.style.background = 'var(--green)';
+    setTimeout(function(){ badge.style.transform = ''; badge.style.background = ''; }, 300);
+  }
+  toast(p.name+' +1','success',1000);
+  // Re-focus search for rapid entry
+  setTimeout(function(){ var s=el('productSearch'); if(s) s.focus(); }, 100);
 }
 function renderCart() {
   el('cartCount').textContent = state.cart.reduce(function(s,i){return s+i.qty;},0);
@@ -3076,11 +3155,18 @@ function populateCategoryFilter() {
 function filterInventory(query) {
   var q=(query||el('inventorySearch').value||'').toLowerCase();
   var cat=el('categoryFilter').value||'';
+  var stockFilter = document.getElementById('stockFilterBtn');
+  var showLowStock = stockFilter && stockFilter.classList.contains('active');
   var filtered=state.products.filter(function(p){
-    return (!q||((p.name&&p.name.toLowerCase().includes(q))||(p.barcode&&p.barcode.includes(q))))
-        && (!cat||p.category===cat);
+    var matchQ = !q||((p.name&&p.name.toLowerCase().includes(q))||(p.barcode&&p.barcode.includes(q)));
+    var matchCat = !cat||p.category===cat;
+    var matchStock = !showLowStock || parseInt(p.stock)<=parseInt(p.minStock||0);
+    return matchQ && matchCat && matchStock;
   });
-  renderInventory(filtered);
+  // Update count
+  var countEl = document.getElementById('inventoryCount');
+  if (countEl) countEl.textContent = filtered.length + ' productos';
+  renderInventory(filtered, q);
 }
 function renderInventory(products) {
   var c=el('inventoryList');
@@ -3776,15 +3862,24 @@ function renderCatalog() {
 
 function catCard(p, fmtFn) {
   var inCart = catalogCart.find(function(i){ return i.id===p.id; });
+  var price = fmtFn ? fmtFn(p.precio_venta) : ('$'+p.precio_venta);
   return '<div class="cat-card" data-pid="'+p.id+'">'
-    +(inCart?'<div class="cat-card-in-cart">'+inCart.qty+'x</div>':'')
-    +'<div class="cat-card-img">'+(p.imagen_url?'<img src="'+p.imagen_url+'" style="width:100%;height:100%;object-fit:cover">':'📦')+'</div>'
-    +'<div class="cat-card-body">'
-    +'<div class="cat-card-name">'+p.nombre+'</div>'
-    +'<div class="cat-card-price">'+(fmtFn?fmtFn(p.precio_venta):('$'+p.precio_venta))+'</div>'
-    +'<div class="cat-card-stock">Stock: '+p.stock+'</div>'
+    +(inCart?'<div class="cat-card-in-cart">'+inCart.qty+'✓</div>':'')
+    +'<div class="cat-card-img">'
+    +(p.imagen_url
+      ?'<img src="'+p.imagen_url+'" style="width:100%;height:100%;object-fit:cover" loading="lazy">'
+      :'<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:4px"><span style="font-size:36px">📦</span><span style="font-size:10px;color:var(--text3)">Sin foto</span></div>')
     +'</div>'
-    +'<button class="cat-card-add" data-pid="'+p.id+'" data-name="'+p.nombre+'" data-price="'+p.precio_venta+'" data-img="'+(p.imagen_url||'')+'">+</button>'
+    +'<div class="cat-card-body">'
+    +'<div class="cat-card-name">'+esc(p.nombre)+'</div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">'
+    +'<div class="cat-card-price">'+price+'</div>'
+    +(p.stock<=3&&p.stock>0?'<span style="font-size:10px;background:var(--yellow-bg);color:var(--yellow);padding:2px 6px;border-radius:100px;font-weight:700">Últimas '+p.stock+'</span>':'')
+    +'</div>'
+    +'</div>'
+    +'<button class="cat-card-add" data-pid="'+p.id+'" data-name="'+esc(p.nombre)+'" data-price="'+p.precio_venta+'" data-img="'+(p.imagen_url||'')+'">'
+    +(inCart?'✓':'+')
+    +'</button>'
     +'</div>';
 }
 
@@ -4627,6 +4722,32 @@ function openCaja() {
 }
 
 
+
+// ============ OVERDUE DEBT REMINDERS ============
+function checkOverdueDebts() {
+  if (!state.clients || !state.clients.length) return;
+  var withDebt = state.clients.filter(function(c){ return parseFloat(c.deuda_total||0) > 0; });
+  if (!withDebt.length) return;
+  var lastCheck = localStorage.getItem('stockapp_debt_check');
+  var today = new Date().toDateString();
+  if (lastCheck === today) return;
+  localStorage.setItem('stockapp_debt_check', today);
+  // Show notification
+  var total = withDebt.reduce(function(s,c){ return s+parseFloat(c.deuda_total||0); },0);
+  var msg = withDebt.length + ' cliente(s) con deuda pendiente · Total: ' + fmt(total);
+  // Show as a dismissible banner
+  var banner = document.createElement('div');
+  banner.id = 'debtBanner';
+  banner.style.cssText = 'position:fixed;top:calc(var(--top-h)+8px);left:14px;right:14px;background:var(--yellow-bg);border:1px solid rgba(255,184,48,0.3);border-radius:var(--r-lg);padding:12px 16px;z-index:500;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow);animation:slideDown 0.3s ease';
+  banner.innerHTML = '<span style="font-size:18px">💸</span>'
+    +'<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--yellow)">Deudas pendientes</div>'
+    +'<div style="font-size:12px;color:var(--text2)">'+msg+'</div></div>'
+    +'<button data-action="showClients" style="background:var(--yellow);color:white;border:none;padding:6px 12px;border-radius:var(--r-sm);font-size:12px;font-weight:700;cursor:pointer">Ver</button>'
+    +'<button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:0 4px">✕</button>';
+  document.body.appendChild(banner);
+  setTimeout(function(){ if(banner.parentElement) banner.remove(); }, 8000);
+}
+
 // ============ EVENT BINDING ============// ============ EVENT BINDING ============
 document.addEventListener('DOMContentLoaded', function() {
 
@@ -4727,6 +4848,30 @@ document.addEventListener('DOMContentLoaded', function() {
   el('addProductBtn').addEventListener('click', function(){ showProductForm(); });
   el('inventorySearch').addEventListener('input', function(){ filterInventory(this.value); });
   el('categoryFilter').addEventListener('change', function(){ filterInventory(); });
+  // Stock filter
+  var stockFilterBtn = document.getElementById('stockFilterBtn');
+  if (stockFilterBtn) stockFilterBtn.addEventListener('click', function(){
+    this.classList.toggle('active');
+    if (this.classList.contains('active')) {
+      this.style.background = 'var(--yellow-bg)';
+      this.style.borderColor = 'rgba(255,184,48,0.5)';
+      this.style.color = 'var(--yellow)';
+    } else {
+      this.style.background = 'var(--surface)';
+      this.style.borderColor = 'var(--border)';
+      this.style.color = 'var(--text2)';
+    }
+    filterInventory();
+  });
+  // Sort by price
+  var sortPriceBtn = document.getElementById('sortPriceBtn');
+  var sortAsc = true;
+  if (sortPriceBtn) sortPriceBtn.addEventListener('click', function(){
+    sortAsc = !sortAsc;
+    this.textContent = sortAsc ? '💰 Precio ↑' : '💰 Precio ↓';
+    state.products.sort(function(a,b){ return sortAsc ? a.salePrice-b.salePrice : b.salePrice-a.salePrice; });
+    filterInventory();
+  });
   el('closeProductModal').addEventListener('click', hideProductForm);
   el('productModalOverlay').addEventListener('click', hideProductForm);
   el('saveProductBtn').addEventListener('click', saveProduct);
