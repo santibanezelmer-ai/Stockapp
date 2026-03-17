@@ -3475,14 +3475,22 @@ var catalogSettings = {};
 var catalogActiveCategory = 'all';
 
 function initCatalogPage() {
-  var params = new URLSearchParams(window.location.search);
-  if (params.get('pedido') === '1' || params.get('catalog') === '1') {
-    document.querySelectorAll('.screen').forEach(function(s){ s.classList.add('hidden'); s.classList.remove('active'); });
-    var os = document.getElementById('orderScreen');
-    os.classList.remove('hidden'); os.classList.add('active');
-    loadCatalog();
-    bindCatalogEvents();
+  if (!window._showCatalog) return;
+  // Hide ALL screens
+  document.querySelectorAll('.screen').forEach(function(s){
+    s.classList.add('hidden');
+    s.classList.remove('active');
+  });
+  // Show catalog
+  var os = document.getElementById('orderScreen');
+  os.classList.remove('hidden');
+  os.classList.add('active');
+  // Store nid for loadCatalog
+  if (window._catalogNid) {
+    localStorage.setItem('stockapp_catalog_negocio_id', window._catalogNid);
   }
+  loadCatalog();
+  bindCatalogEvents();
 }
 
 async function loadCatalog() {
