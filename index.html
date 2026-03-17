@@ -2025,7 +2025,21 @@ async function apiRegister({ businessName, ownerName, email, password }) {
     });
     console.log('Config response:', c.status, JSON.stringify(c.data));
 
-    return { success: true, data: { negocio_id: negocio.id } };
+    // 4. Create subdomain via Cloudflare Worker
+    var storeUrl = window.location.origin + '/?t=' + slug; // fallback
+    try {
+      var workerRes = await fetch('https://operixerp.cloud/api/create-subdomain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: slug, negocio_id: negocio.id })
+      });
+      var workerData = await workerRes.json();
+      if (workerData.success) storeUrl = workerData.url;
+    } catch(e) {
+      console.log('Subdomain creation skipped (worker not ready):', e.message);
+    }
+
+    return { success: true, data: { negocio_id: negocio.id, slug: slug, storeUrl: storeUrl } };
   } catch(e) {
     console.error('apiRegister error:', e);
     return { success: false, message: 'Error: ' + e.message };
@@ -5322,18 +5336,21 @@ document.addEventListener('DOMContentLoaded', function() {
   if (window._showCatalog) return;
   // Apply layout BEFORE showing app so sidebar is ready
   initLayout();
-  // Check ?t=slug for direct store access
+  // Check for Worker-injected store or ?t=slug
   (function(){
     try {
+      // If Worker injected negocio_id (subdomain access)
+      if (window._storeNegocioId) {
+        localStorage.setItem('stockapp_store_negocio_id', window._storeNegocioId);
+        localStorage.setItem('stockapp_store_name', window._storeName || '');
+        // Pre-fill hint
+        var hint = document.getElementById('loginStoreHint');
+        if (hint) { hint.textContent = 'Bienvenido a ' + (window._storeName||'tu tienda'); hint.style.display='block'; }
+      }
+      // Fallback: ?t=slug
       var params = new URLSearchParams(window.location.search);
       var slug = params.get('t');
-      if (slug && !window._showCatalog) {
-        // Pre-fill login hint
-        var hint = document.getElementById('loginStoreHint');
-        if (hint) { hint.textContent = 'Accediendo a tu tienda...'; hint.style.display='block'; }
-        // Store slug for reference
-        localStorage.setItem('stockapp_last_slug', slug);
-      }
+      if (slug) localStorage.setItem('stockapp_last_slug', slug);
     } catch(e) {}
   })();
   var saved = sessionStorage.getItem('stockapp_user');
