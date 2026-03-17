@@ -144,6 +144,18 @@ tr:hover td { background: var(--surface2); }
 
 .empty-state { text-align: center; padding: 40px; color: var(--text3); }
 .loading-row td { text-align: center; padding: 40px; color: var(--text2); }
+
+/* ── SUBSCRIPTION ── */
+.sub-active  { color: var(--green); font-weight: 700; }
+.sub-expiring { color: var(--yellow); font-weight: 700; }
+.sub-expired { color: var(--red); font-weight: 700; }
+.sub-none    { color: var(--text3); }
+.duration-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 16px; }
+.duration-btn { padding: 12px 8px; background: var(--surface2); border: 1.5px solid var(--border); border-radius: var(--r); color: var(--text2); font-family: var(--font2); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; text-align: center; }
+.duration-btn:hover { border-color: var(--accent); color: var(--accent2); }
+.duration-btn.selected { background: var(--accent-glow); border-color: var(--accent); color: var(--accent2); }
+.sub-summary { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 14px; font-size: 13px; color: var(--text2); margin-top: 12px; line-height: 1.8; }
+.sub-summary strong { color: var(--text); }
 </style>
 </head>
 <body>
@@ -184,6 +196,7 @@ tr:hover td { background: var(--surface2); }
       <div class="stat-card"><div class="stat-label">Planes pagados</div><div class="stat-value green" id="statPaid">0</div></div>
       <div class="stat-card"><div class="stat-label">Plan free</div><div class="stat-value yellow" id="statFree">0</div></div>
       <div class="stat-card"><div class="stat-label">Bloqueados</div><div class="stat-value red" id="statBlocked">0</div></div>
+      <div class="stat-card"><div class="stat-label">Vencen en 7 días</div><div class="stat-value yellow" id="statExpiring">0</div></div>
     </div>
 
     <!-- Toolbar -->
@@ -209,8 +222,9 @@ tr:hover td { background: var(--surface2); }
               <th>Negocio</th>
               <th>Email</th>
               <th>Plan</th>
+              <th>Suscripción</th>
+              <th>Vence</th>
               <th>Registro</th>
-              <th>Último acceso</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -269,6 +283,62 @@ tr:hover td { background: var(--surface2); }
   </div>
 </div>
 
+<!-- MODAL SUSCRIPCION -->
+<div class="modal-overlay hidden" id="subModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>📅 Suscripción — <span id="subBizName"></span></h3>
+      <button class="modal-close" id="closeSubModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="subBizId">
+
+      <!-- Current status -->
+      <div id="subCurrentStatus" class="sub-summary" style="margin-bottom:16px"></div>
+
+      <!-- Start date -->
+      <div class="form-group">
+        <label>Fecha de inicio</label>
+        <input type="date" id="subStartDate" style="width:100%;padding:12px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font2);font-size:14px;outline:none">
+      </div>
+
+      <!-- Duration -->
+      <div class="form-group">
+        <label>Duración del plan</label>
+        <div class="duration-grid">
+          <button class="duration-btn" data-months="1">1 mes</button>
+          <button class="duration-btn" data-months="2">2 meses</button>
+          <button class="duration-btn" data-months="3">3 meses</button>
+          <button class="duration-btn" data-months="6">6 meses</button>
+          <button class="duration-btn" data-months="9">9 meses</button>
+          <button class="duration-btn" data-months="12">1 año</button>
+        </div>
+      </div>
+
+      <!-- Plan -->
+      <div class="form-group">
+        <label>Plan</label>
+        <select id="subPlan" style="width:100%;padding:12px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font2);font-size:14px;outline:none">
+          <option value="trial">⏳ Trial</option>
+          <option value="paid">💎 Pagado</option>
+          <option value="free">🆓 Free</option>
+        </select>
+      </div>
+
+      <!-- End date preview -->
+      <div id="subPreview" class="sub-summary hidden">
+        📅 Inicio: <strong id="previewStart">—</strong><br>
+        ⏱ Duración: <strong id="previewMonths">—</strong><br>
+        🏁 Vence el: <strong id="previewEnd" style="color:var(--green)">—</strong>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" id="cancelSubBtn">Cancelar</button>
+      <button class="btn btn-primary" id="saveSubBtn" style="width:auto">💾 Guardar suscripción</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container" id="toastContainer"></div>
 
 <script>
@@ -311,6 +381,32 @@ async function sbFetch(path, options) {
   var text = await res.text();
   try { return { ok: res.ok, status: res.status, data: JSON.parse(text) }; }
   catch(e) { return { ok: res.ok, status: res.status, data: text }; }
+}
+
+// ── SUBSCRIPTION HELPERS ──
+function getSubStatus(n) {
+  if (!n.suscripcion_fin) return { cls: 'sub-none', label: 'Sin asignar' };
+  var fin = new Date(n.suscripcion_fin);
+  var now = new Date();
+  var diffDays = Math.ceil((fin - now) / (1000*60*60*24));
+  if (diffDays < 0)  return { cls: 'sub-expired',  label: '⚠ Vencida' };
+  if (diffDays <= 7) return { cls: 'sub-expiring', label: '⏰ Vence en '+diffDays+'d' };
+  return { cls: 'sub-active', label: '✅ Activa ('+diffDays+'d)' };
+}
+function addMonths(date, months) {
+  var d = new Date(date);
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0,10);
+}
+function updateSubPreview() {
+  var start = el('subStartDate').value;
+  var months = parseInt(document.querySelector('.duration-btn.selected') && document.querySelector('.duration-btn.selected').dataset.months || 0);
+  if (!start || !months) { el('subPreview').classList.add('hidden'); return; }
+  var end = addMonths(start, months);
+  el('previewStart').textContent = fmtDate(start);
+  el('previewMonths').textContent = months + (months===1?' mes':' meses');
+  el('previewEnd').textContent = fmtDate(end);
+  el('subPreview').classList.remove('hidden');
 }
 
 // ── AUTH ──
@@ -357,10 +453,18 @@ async function loadNegocios() {
 
 function updateStats() {
   var n = state.negocios;
+  var expiring = n.filter(function(x){
+    if (!x.suscripcion_fin) return false;
+    var d = Math.ceil((new Date(x.suscripcion_fin)-new Date())/(1000*60*60*24));
+    return d>=0 && d<=7;
+  });
   el('statTotal').textContent   = n.length;
   el('statPaid').textContent    = n.filter(function(x){ return x.plan==='paid'; }).length;
   el('statFree').textContent    = n.filter(function(x){ return x.plan==='free'||x.plan==='trial'; }).length;
   el('statBlocked').textContent = n.filter(function(x){ return x.plan==='blocked'; }).length;
+  // Update expiring badge if exists
+  var expEl = document.getElementById('statExpiring');
+  if (expEl) expEl.textContent = expiring.length;
 }
 
 function applyFilter() {
@@ -386,15 +490,19 @@ function renderTable() {
   tbody.innerHTML = state.filtered.map(function(n){
     var plan = n.plan || 'free';
     var isBlocked = plan === 'blocked';
+    var subStatus = getSubStatus(n);
     return '<tr>'
-      + '<td><strong style="font-size:14px">'+esc(n.nombre)+'</strong></td>'
+      + '<td><strong style="font-size:14px">'+esc(n.nombre)+'</strong>'
+      + (n.notas_admin ? '<div style="font-size:11px;color:var(--text3);margin-top:2px">📝 '+esc(n.notas_admin)+'</div>' : '')
+      + '</td>'
       + '<td style="color:var(--text2)">'+esc(n.email)+'</td>'
       + '<td><span class="badge '+(planBadge[plan]||'badge-free')+'">'+(planLabel[plan]||plan)+'</span></td>'
+      + '<td><span class="'+subStatus.cls+'">'+subStatus.label+'</span></td>'
+      + '<td style="color:var(--text2)">'+(n.suscripcion_fin ? fmtDate(n.suscripcion_fin) : '—')+'</td>'
       + '<td style="color:var(--text2)">'+fmtDate(n.created_at)+'</td>'
-      + '<td style="color:var(--text2)">'+fmtDate(n.lastAccess)+'</td>'
       + '<td><div class="actions">'
       + '<button class="btn-sm '+(isBlocked?'btn-unblock':'btn-block')+'" data-id="'+n.id+'" data-action="'+(isBlocked?'unblock':'block')+'">'+(isBlocked?'✅ Desbloquear':'🚫 Bloquear')+'</button>'
-      + '<button class="btn-sm btn-paid" data-id="'+n.id+'" data-name="'+esc(n.nombre)+'" data-action="plan">💳 Plan</button>'
+      + '<button class="btn-sm btn-paid" data-id="'+n.id+'" data-name="'+esc(n.nombre)+'" data-inicio="'+(n.suscripcion_inicio||'')+'" data-fin="'+(n.suscripcion_fin||'')+'" data-meses="'+(n.suscripcion_meses||1)+'" data-plan="'+plan+'" data-action="sub">📅 Suscripción</button>'
       + '<button class="btn-sm btn-msg" data-id="'+n.id+'" data-name="'+esc(n.nombre)+'" data-email="'+esc(n.email||'')+'" data-action="msg">📩 Mensaje</button>'
       + '</div></td>'
       + '</tr>';
@@ -426,6 +534,26 @@ async function changePlan(id, plan) {
     el('planModal').classList.add('hidden');
     toast('Plan actualizado a: ' + plan, 'success');
   } else toast('Error','error');
+}
+
+async function saveSub(id, plan, inicio, meses) {
+  var fin = addMonths(inicio, meses);
+  var res = await sbFetch('/rest/v1/negocios?id=eq.' + id, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      plan: plan,
+      suscripcion_inicio: inicio,
+      suscripcion_fin: fin,
+      suscripcion_meses: meses
+    })
+  });
+  if (res.ok) {
+    var n = state.negocios.find(function(x){ return x.id===id; });
+    if (n) { n.plan=plan; n.suscripcion_inicio=inicio; n.suscripcion_fin=fin; n.suscripcion_meses=meses; }
+    updateStats(); applyFilter();
+    el('subModal').classList.add('hidden');
+    toast('Suscripción guardada — vence el '+fmtDate(fin), 'success', 4000);
+  } else toast('Error al guardar','error');
 }
 
 async function saveNote(id, note) {
@@ -478,6 +606,26 @@ document.addEventListener('DOMContentLoaded', function(){
     var id = btn.dataset.id;
     if (action === 'block')   blockNegocio(id, true);
     if (action === 'unblock') blockNegocio(id, false);
+    if (action === 'sub') {
+      el('subBizId').value = id;
+      el('subBizName').textContent = btn.dataset.name || '';
+      // Set current status
+      var n = state.negocios.find(function(x){ return x.id===id; });
+      var st = n ? getSubStatus(n) : { cls:'sub-none', label:'Sin asignar' };
+      el('subCurrentStatus').innerHTML = '📊 Estado actual: <strong class="'+st.cls+'">'+st.label+'</strong>'
+        + (n && n.suscripcion_inicio ? '<br>📅 Inicio: <strong>'+fmtDate(n.suscripcion_inicio)+'</strong>' : '')
+        + (n && n.suscripcion_fin    ? '<br>🏁 Vence: <strong>'+fmtDate(n.suscripcion_fin)+'</strong>' : '');
+      // Pre-fill
+      el('subStartDate').value = (n && n.suscripcion_inicio) ? n.suscripcion_inicio : new Date().toISOString().slice(0,10);
+      el('subPlan').value = (n && n.plan) || 'paid';
+      document.querySelectorAll('.duration-btn').forEach(function(b){ b.classList.remove('selected'); });
+      var meses = (n && n.suscripcion_meses) || 1;
+      var selBtn = document.querySelector('.duration-btn[data-months="'+meses+'"]');
+      if (selBtn) selBtn.classList.add('selected');
+      el('subPreview').classList.add('hidden');
+      updateSubPreview();
+      el('subModal').classList.remove('hidden');
+    }
     if (action === 'plan') {
       el('planBizId').value = id;
       el('planBizName').textContent = btn.dataset.name || '';
@@ -501,6 +649,27 @@ document.addEventListener('DOMContentLoaded', function(){
   });
   el('planModal').querySelector('.modal-overlay-bg') && el('planModal').addEventListener('click', function(e){
     if (e.target === el('planModal')) el('planModal').classList.add('hidden');
+  });
+
+  // Subscription modal
+  el('closeSubModal').addEventListener('click', function(){ el('subModal').classList.add('hidden'); });
+  el('cancelSubBtn').addEventListener('click',  function(){ el('subModal').classList.add('hidden'); });
+  el('subStartDate').addEventListener('change', updateSubPreview);
+  document.querySelectorAll('.duration-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.duration-btn').forEach(function(b){ b.classList.remove('selected'); });
+      btn.classList.add('selected');
+      updateSubPreview();
+    });
+  });
+  el('saveSubBtn').addEventListener('click', function(){
+    var id     = el('subBizId').value;
+    var plan   = el('subPlan').value;
+    var inicio = el('subStartDate').value;
+    var selBtn = document.querySelector('.duration-btn.selected');
+    if (!inicio)  { toast('Selecciona fecha de inicio','error'); return; }
+    if (!selBtn)  { toast('Selecciona duración','error'); return; }
+    saveSub(id, plan, inicio, parseInt(selBtn.dataset.months));
   });
 
   // Msg modal
