@@ -3316,27 +3316,8 @@ function applyLayout(mode) {
   document.body.classList.remove('desktop-mode');
   if (mode === 'desktop') document.body.classList.add('desktop-mode');
   localStorage.setItem('stockapp_layout', mode);
-  // Sync toggle in settings
   var desktopToggle = document.getElementById('desktopModeToggle');
   if (desktopToggle) desktopToggle.checked = mode === 'desktop';
-
-  // Re-bind sidebar buttons (they may not have been visible when first bound)
-  document.querySelectorAll('.sidebar .nav-btn').forEach(function(btn){
-    // Remove old listeners by cloning
-    var newBtn = btn.cloneNode(true);
-    btn.parentNode.replaceChild(newBtn, btn);
-    newBtn.addEventListener('click', function(){
-      closeMoreDrawer && closeMoreDrawer();
-      showSection(newBtn.dataset.section);
-    });
-  });
-
-  // Reload current section data after layout change
-  if (state && state.currentSection && mode === 'desktop') {
-    setTimeout(function(){
-      showSection(state.currentSection);
-    }, 100);
-  }
 }
 function initLayout() {
   var saved = localStorage.getItem('stockapp_layout') || 'mobile';
@@ -4188,12 +4169,7 @@ document.addEventListener('DOMContentLoaded', function() {
       showSection(btn.dataset.section);
     });
   });
-  // Sidebar buttons
-  document.querySelectorAll('.sidebar .nav-btn').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      showSection(btn.dataset.section);
-    });
-  });
+
   // More drawer
   document.getElementById('moreDrawerOverlay').addEventListener('click', closeMoreDrawer);
   document.querySelectorAll('.more-item').forEach(function(btn){
