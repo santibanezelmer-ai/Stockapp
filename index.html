@@ -228,7 +228,7 @@ html, body {
 .content-area { flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; min-height: 0; height: 0; }
 
 /* ── SECTION ── */
-.section { display: none; padding: 16px 14px calc(var(--nav-h) + 24px); min-height: unset; }
+.section { display: none; padding: 16px 14px calc(var(--nav-h) + 24px); min-height: unset; position: relative; z-index: 0; }
 .section.active { display: block; }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
 .section-header h2 { font-family: var(--font); font-size: 22px; font-weight: 800; letter-spacing: -0.3px; }
@@ -567,7 +567,7 @@ html, body {
 
 /* ── MORE DRAWER ── */
 .bottom-nav { grid-template-columns: repeat(5,1fr); }
-.more-drawer { position:fixed; inset:0; z-index:300; display:flex; align-items:flex-end; }
+.more-drawer { position:fixed; inset:0; z-index:400; display:flex; align-items:flex-end; }
 .more-drawer.hidden { display:none !important; }
 .more-drawer-overlay { position:absolute; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); }
 .more-drawer-content { position:relative; width:100%; background:var(--bg2); border-radius:var(--r-2xl) var(--r-2xl) 0 0; border-top:1px solid var(--border2); padding:8px 20px 32px; animation:slideUp 0.22s cubic-bezier(.32,.72,0,1); }
@@ -1980,10 +1980,17 @@ async function apiLogin({ user, pass }) {
 // ── REGISTER NEW BUSINESS ─────────────────────────
 async function apiRegister({ businessName, ownerName, email, password }) {
   try {
+    // Generate slug from business name
+    const slug = businessName.toLowerCase()
+      .replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i')
+      .replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n')
+      .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,30)
+      + '-' + Date.now().toString(36);
+
     // 1. Create negocio
     const n = await sbFetch('/rest/v1/negocios', {
       method: 'POST',
-      body: JSON.stringify({ nombre: businessName, email })
+      body: JSON.stringify({ nombre: businessName, email, slug })
     });
     console.log('Negocio response:', n.status, JSON.stringify(n.data));
     if (!n.ok) {
@@ -2585,13 +2592,38 @@ async function doRegister() {
   hidden('regError');
   var res = await apiRegister({ businessName: business, ownerName: name, email, password: pass });
   if (res.success) {
-    toast('Tienda creada! Iniciando sesion...', 'success', 3000);
+    var storeUrl = window.location.href.split('?')[0] + '?t=' + (res.data && res.data.slug || '');
+    toast('Tienda creada!', 'success', 2000);
+    // Show the store URL
     setTimeout(function(){
-      el('loginUser').value = email;
-      el('loginPass').value = pass;
-      showLogin();
-      setTimeout(doLogin, 500);
-    }, 1000);
+      showBottomSheet && showBottomSheet('Tu tienda fue creada',
+        '<div style="text-align:center;padding:8px 0">'
+        +'<div style="font-size:48px;margin-bottom:12px">🎉</div>'
+        +'<p style="font-size:14px;color:var(--text2);margin-bottom:16px">Tu link directo de acceso:</p>'
+        +'<div style="background:var(--bg2);border:1.5px solid var(--accent);border-radius:var(--r);padding:12px;font-size:12px;color:var(--accent2);word-break:break-all;font-family:monospace;margin-bottom:16px">'+storeUrl+'</div>'
+        +'<button id="copyStoreUrl" class="btn btn-outline" style="width:100%;margin-bottom:8px">📋 Copiar link</button>'
+        +'<button id="goToStoreLogin" class="btn btn-primary" style="width:100%">Entrar a mi tienda →</button>'
+        +'</div>'
+      );
+      setTimeout(function(){
+        var copyBtn = document.getElementById('copyStoreUrl');
+        if(copyBtn) copyBtn.addEventListener('click', function(){
+          var ta=document.createElement('textarea'); ta.value=storeUrl;
+          ta.style.position='fixed'; ta.style.top='-9999px';
+          document.body.appendChild(ta); ta.focus(); ta.select();
+          try{ document.execCommand('copy'); toast('Link copiado','success'); }catch(e){}
+          document.body.removeChild(ta);
+        });
+        var goBtn = document.getElementById('goToStoreLogin');
+        if(goBtn) goBtn.addEventListener('click', function(){
+          closeBottomSheet && closeBottomSheet();
+          el('loginUser').value = email;
+          el('loginPass').value = pass;
+          showLogin();
+          setTimeout(doLogin, 300);
+        });
+      }, 100);
+    }, 500);
   } else {
     var errMsg = res.message || 'Error al crear la tienda';
     el('regError').textContent = errMsg;
@@ -4738,7 +4770,9 @@ function checkOverdueDebts() {
   // Show as a dismissible banner
   var banner = document.createElement('div');
   banner.id = 'debtBanner';
-  banner.style.cssText = 'position:fixed;top:calc(var(--top-h)+8px);left:14px;right:14px;background:var(--yellow-bg);border:1px solid rgba(255,184,48,0.3);border-radius:var(--r-lg);padding:12px 16px;z-index:500;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow);animation:slideDown 0.3s ease';
+  // In desktop mode, offset banner past sidebar
+  var sidebarWidth = document.body.classList.contains('desktop-mode') ? '244px' : '14px';
+  banner.style.cssText = 'position:fixed;top:calc(var(--top-h)+8px);left:'+sidebarWidth+';right:14px;background:var(--yellow-bg);border:1px solid rgba(255,184,48,0.3);border-radius:var(--r-lg);padding:12px 16px;z-index:500;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow);animation:slideDown 0.3s ease';
   banner.innerHTML = '<span style="font-size:18px">💸</span>'
     +'<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--yellow)">Deudas pendientes</div>'
     +'<div style="font-size:12px;color:var(--text2)">'+msg+'</div></div>'
@@ -5213,6 +5247,20 @@ document.addEventListener('DOMContentLoaded', function() {
   if (window._showCatalog) return;
   // Apply layout BEFORE showing app so sidebar is ready
   initLayout();
+  // Check ?t=slug for direct store access
+  (function(){
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var slug = params.get('t');
+      if (slug && !window._showCatalog) {
+        // Pre-fill login hint
+        var hint = document.getElementById('loginStoreHint');
+        if (hint) { hint.textContent = 'Accediendo a tu tienda...'; hint.style.display='block'; }
+        // Store slug for reference
+        localStorage.setItem('stockapp_last_slug', slug);
+      }
+    } catch(e) {}
+  })();
   var saved = sessionStorage.getItem('stockapp_user');
   if(saved){ try{ state.currentUser=JSON.parse(saved); showApp(); }catch(e){ sessionStorage.removeItem('stockapp_user'); } }
 });
