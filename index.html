@@ -812,33 +812,15 @@ body.desktop-mode .modal { align-items: center; }
 </head>
 <body>
 <script>
-// IMMEDIATE catalog check — runs before DOM renders
+// Set catalog flags immediately (no DOM needed)
 (function(){
   try {
     var params = new URLSearchParams(window.location.search);
     if (params.get('pedido') === '1' || params.get('catalog') === '1') {
       window._showCatalog = true;
       window._catalogNid = params.get('nid') || '';
-      // Add class to body immediately
-      document.addEventListener('DOMContentLoaded', function(){
-        // Hide all screens
-        document.querySelectorAll('.screen').forEach(function(s){
-          s.classList.add('hidden');
-          s.classList.remove('active');
-        });
-        // Show catalog screen
-        var os = document.getElementById('orderScreen');
-        if (os) { os.classList.remove('hidden'); os.classList.add('active'); }
-        // Store nid
-        if (window._catalogNid) {
-          localStorage.setItem('stockapp_catalog_negocio_id', window._catalogNid);
-        }
-        // Load catalog
-        if (typeof loadCatalog === 'function') { loadCatalog(); bindCatalogEvents(); }
-        else { setTimeout(function(){ if(typeof loadCatalog==='function'){ loadCatalog(); bindCatalogEvents(); } }, 500); }
-      });
     }
-  } catch(e) { console.error('catalog init error:', e); }
+  } catch(e) {}
 })();
 </script>
 
@@ -3773,6 +3755,10 @@ function bindCatalogEvents() {
 // ============ EVENT BINDING ============// ============ EVENT BINDING ============
 document.addEventListener('DOMContentLoaded', function() {
 
+  // Check catalog mode first
+  initCatalogPage();
+  if (window._showCatalog) return; // Don't bind app events in catalog mode
+
   // Login
   el('loginBtn').addEventListener('click', doLogin);
   var regBtn = document.getElementById('regBtn');
@@ -4153,7 +4139,8 @@ document.addEventListener('DOMContentLoaded', function() {
   loadOfflineQueue();
   if (state.offlineQueue.length > 0) toast(state.offlineQueue.length+' operación(es) pendiente(s) de sincronizar','warning',4000);
   checkOnline();
-  // Session restore
+  // Session restore (skip in catalog mode)
+  if (window._showCatalog) return;
   var saved = sessionStorage.getItem('stockapp_user');
   if(saved){ try{ state.currentUser=JSON.parse(saved); showApp(); }catch(e){ sessionStorage.removeItem('stockapp_user'); } }
 });
