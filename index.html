@@ -4374,8 +4374,8 @@ document.addEventListener('DOMContentLoaded', function() {
   // Event delegation for dynamic elements
   document.addEventListener('click', function(e) {
     // Sidebar nav buttons (desktop mode) — event delegation
-    var sideBtn = e.target.closest('.sidebar .nav-btn');
-    if (sideBtn && sideBtn.dataset.section) {
+    var sideBtn = e.target.closest('.nav-btn');
+    if (sideBtn && sideBtn.dataset.section && sideBtn.closest('.sidebar')) {
       showSection(sideBtn.dataset.section);
       return;
     }
