@@ -3752,6 +3752,398 @@ function bindCatalogEvents() {
 }
 
 
+
+// ============ TODAY SALES HISTORY ============
+function getTodaySales() {
+  var key = 'stockapp_sales_' + new Date().toDateString();
+  try { return JSON.parse(localStorage.getItem(key)||'[]'); } catch(e){ return []; }
+}
+function saveTodaySales(arr) {
+  var key = 'stockapp_sales_' + new Date().toDateString();
+  try { localStorage.setItem(key, JSON.stringify(arr)); } catch(e){}
+}
+function showTodaySales() {
+  var sales = getTodaySales();
+  var total = sales.reduce(function(s,v){ return s+(v.total||0); }, 0);
+  var body2 = '<div style="padding:4px 0 14px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+    +'<span style="font-size:13px;color:var(--text2);font-weight:600">'+sales.length+' ventas hoy</span>'
+    +'<span style="font-family:var(--font);font-size:18px;font-weight:800;color:var(--green)">'+fmt(total)+'</span></div>';
+  if (!sales.length) {
+    body2 += '<div class="empty-state" style="padding:24px"><span>🛒</span><p>Sin ventas hoy</p></div>';
+  } else {
+    body2 += sales.map(function(s){
+      var cancelled = s.cancelled;
+      return '<div class="data-item" style="'+(cancelled?'opacity:0.4':'')+'">'
+        +'<div class="data-item-icon">🛒</div>'
+        +'<div class="data-item-info"><div class="data-item-title">'+(cancelled?'[ANULADA] ':'')+'#'+(s.id||'').toString().slice(-6)+'</div>'
+        +'<div class="data-item-subtitle">'+(s.date||'')+' · '+(s.payment||'')+'</div></div>'
+        +'<div style="display:flex;align-items:center;gap:8px">'
+        +'<span style="font-family:var(--font);font-weight:800;color:'+(cancelled?'var(--text3)':'var(--green)')+'">'+fmt(s.total)+'</span>'
+        +(!cancelled?'<button class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:none;padding:6px 10px;border-radius:8px;font-size:12px" data-cancel-id="'+(s.id||'')+'">Anular</button>':'')
+        +'</div></div>';
+    }).join('');
+  }
+  body2 += '</div>';
+  showBottomSheet('Ventas de Hoy', body2);
+  setTimeout(function(){
+    document.querySelectorAll('[data-cancel-id]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var sid = this.getAttribute('data-cancel-id');
+        if (!confirm('Anular venta?')) return;
+        showLoading('Anulando...');
+        gasCall('cancelSale',{ saleId:sid }).then(function(res){
+          if (res.success) {
+            var s2=getTodaySales(); var f=s2.find(function(x){ return String(x.id)===String(sid); });
+            if(f){ f.cancelled=true; saveTodaySales(s2); }
+            toast('Venta anulada','success'); closeBottomSheet();
+          } else toast(res.message||'Error','error');
+        }).finally(hideLoading);
+      });
+    });
+  }, 150);
+}
+
+// ============ ORDER HISTORY ============
+function getOrderHistory() {
+  try { return JSON.parse(localStorage.getItem('stockapp_orders')||'[]'); } catch(e){ return []; }
+}
+function saveOrderToHistory(order) {
+  var orders = getOrderHistory();
+  order.id = 'PED-' + Date.now();
+  order.savedAt = new Date().toLocaleString('es-CL');
+  order.status = 'pendiente';
+  orders.unshift(order);
+  if (orders.length > 100) orders = orders.slice(0,100);
+  try { localStorage.setItem('stockapp_orders', JSON.stringify(orders)); } catch(e){}
+  return order.id;
+}
+function loadOrdersSection() {
+  var orders = getOrderHistory();
+  var totalVal = orders.reduce(function(s,o){ return s+(o.total||0); }, 0);
+  var countEl = document.getElementById('ordersTotalCount');
+  var valEl = document.getElementById('ordersTotalValue');
+  if (countEl) countEl.textContent = orders.length;
+  if (valEl) valEl.textContent = fmt(totalVal);
+  var list = document.getElementById('ordersHistoryList');
+  if (!list) return;
+  if (!orders.length) {
+    list.innerHTML = '<div class="empty-state"><span>📲</span><p>Sin pedidos aún</p></div>';
+    return;
+  }
+  list.innerHTML = orders.map(function(o){
+    var statusColor = { pendiente:'var(--yellow)', confirmado:'var(--green)', cancelado:'var(--red)' }[o.status]||'var(--text2)';
+    var statusLabel = { pendiente:'⏳ Pendiente', confirmado:'✅ Confirmado', cancelado:'❌ Cancelado' }[o.status]||o.status;
+    return '<div class="order-history-card" data-oid="'+o.id+'">'
+      +'<div class="order-history-header">'
+      +'<div><div style="font-weight:700;font-size:14px">'+esc(o.clientName||'Sin nombre')+'</div>'
+      +'<div style="font-size:12px;color:var(--text2)">'+esc(o.clientPhone||'')+' · '+esc(o.savedAt||'')+'</div></div>'
+      +'<div style="text-align:right"><div style="font-family:var(--font);font-size:16px;font-weight:800;color:var(--green)">'+fmt(o.total||0)+'</div>'
+      +'<div style="font-size:11px;font-weight:700;color:'+statusColor+'">'+statusLabel+'</div></div></div>'
+      +'<div style="font-size:12px;color:var(--text2);margin:6px 0 10px">'
+      +(o.items||[]).map(function(i){ return i.qty+'× '+esc(i.name); }).join(' · ')+'</div>'
+      +'<div class="order-history-actions">'
+      +'<button class="btn btn-sm btn-whatsapp" data-oid="'+o.id+'">📲 Reenviar</button>'
+      +'<button class="btn btn-sm btn-success" data-oid="'+o.id+'" data-action="confirm">✅ Confirmar</button>'
+      +'<button class="btn btn-sm btn-danger" data-oid="'+o.id+'" data-action="cancel">✕ Cancelar</button>'
+      +'</div></div>';
+  }).join('');
+}
+
+// ============ PAYABLES ============
+function loadPayablesSection() {
+  showLoading('Cargando...');
+  gasCall('getPayables').then(function(res){
+    hideLoading();
+    if (!res.success) return;
+    var items = res.data||[];
+    var total = items.filter(function(p){ return p.status!=='pagada'; }).reduce(function(s,p){ return s+parseFloat(p.amount||0); },0);
+    var overdue = items.filter(function(p){ return p.status==='vencida'; }).length;
+    var el1=document.getElementById('payablesTotalPending'); if(el1) el1.textContent=fmt(total);
+    var el2=document.getElementById('payablesOverdue'); if(el2) el2.textContent=overdue;
+    var list=document.getElementById('payablesList');
+    if (!list) return;
+    if (!items.length) { list.innerHTML='<div class="empty-state"><span>💸</span><p>Sin cuentas pendientes</p></div>'; return; }
+    list.innerHTML=items.map(function(p){
+      var isOverdue=p.status==='vencida', isPaid=p.status==='pagada';
+      return '<div class="payable-card'+(isOverdue?' overdue':'')+'">'
+        +'<div class="payable-header"><div><div style="font-weight:700;font-size:15px">'+esc(p.supplier||'Sin proveedor')+'</div>'
+        +'<div style="font-size:12px;color:var(--text2)">'+esc(p.description||'')+' · Vence: '+esc(p.dueDate||'-')+'</div></div>'
+        +'<div style="text-align:right"><div style="font-family:var(--font);font-size:18px;font-weight:800;color:'+(isPaid?'var(--green)':isOverdue?'var(--red)':'var(--text)')+'">'+fmt(p.amount)+'</div>'
+        +'<div style="font-size:11px;font-weight:700;color:'+(isPaid?'var(--green)':isOverdue?'var(--red)':'var(--yellow)')+'">'+( isPaid?'✅ Pagada':isOverdue?'⚠ Vencida':'⏳ Pendiente')+'</div></div></div>'
+        +(!isPaid?'<div class="payable-actions">'
+          +'<button class="btn btn-success" data-payid="'+p.id+'" data-action="pay">💰 Pagar</button>'
+          +'<button class="btn btn-whatsapp" data-payid="'+p.id+'" data-supplier="'+esc(p.supplier||'')+'" data-amount="'+p.amount+'" data-action="remind">📲 Recordar</button>'
+          +'</div>':'')
+        +'</div>';
+    }).join('');
+  }).catch(function(){ hideLoading(); });
+}
+function showAddPayableForm() {
+  showBottomSheet('Nueva Cuenta por Pagar',
+    '<div class="form-group"><label>Proveedor *</label><input type="text" id="paySupplier" placeholder="Nombre del proveedor"></div>'
+    +'<div class="form-row"><div class="form-group"><label>Monto *</label><input type="number" id="payAmount2" placeholder="$0" min="0"></div>'
+    +'<div class="form-group"><label>Vencimiento</label><input type="date" id="payDue"></div></div>'
+    +'<div class="form-group"><label>Descripción</label><input type="text" id="payDesc" placeholder="Factura mayo..."></div>'
+    +'<div class="form-actions"><button id="savePayableBtn" class="btn btn-primary">💾 Guardar</button><button id="cancelPayableBtn" class="btn btn-outline">Cancelar</button></div>'
+  );
+  setTimeout(function(){
+    var s=document.getElementById('savePayableBtn');
+    if(s) s.addEventListener('click', function(){
+      var supplier=document.getElementById('paySupplier').value.trim();
+      var amount=parseFloat(document.getElementById('payAmount2').value)||0;
+      if(!supplier||!amount){ toast('Completa proveedor y monto','warning'); return; }
+      showLoading('Guardando...');
+      gasCall('createPayable',{ supplier:supplier, description:document.getElementById('payDesc').value.trim(), amount:amount, dueDate:document.getElementById('payDue').value })
+        .then(function(res){ if(res.success){ toast('Cuenta registrada','success'); closeBottomSheet(); loadPayablesSection(); } else toast(res.message||'Error','error'); })
+        .finally(hideLoading);
+    });
+    var c=document.getElementById('cancelPayableBtn'); if(c) c.addEventListener('click', closeBottomSheet);
+  }, 100);
+}
+
+// ============ QUOTES ============
+function getLocalQuotes() { try{ return JSON.parse(localStorage.getItem('stockapp_quotes')||'[]'); }catch(e){ return []; } }
+function saveLocalQuotes(arr) { try{ localStorage.setItem('stockapp_quotes', JSON.stringify(arr)); }catch(e){} }
+function loadQuotesSection() {
+  var quotes=getLocalQuotes();
+  var countEl=document.getElementById('quotesTotalCount'); if(countEl) countEl.textContent=quotes.length;
+  var accEl=document.getElementById('quotesAccepted'); if(accEl) accEl.textContent=quotes.filter(function(q){ return q.status==='accepted'; }).length;
+  var list=document.getElementById('quotesList');
+  if(!list) return;
+  if(!quotes.length){ list.innerHTML='<div class="empty-state"><span>📄</span><p>Sin presupuestos</p></div>'; return; }
+  var statusMap={pending:'pending',accepted:'accepted',rejected:'rejected'};
+  var statusLabel={pending:'⏳ Pendiente',accepted:'✅ Aceptado',rejected:'❌ Rechazado'};
+  list.innerHTML=quotes.map(function(q){
+    return '<div class="quote-card">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
+      +'<div><div style="font-weight:700;font-size:15px">'+esc(q.clientName||'Sin cliente')+'</div>'
+      +'<div style="font-size:12px;color:var(--text2)">'+esc(q.id)+' · '+esc(q.date||'')+'</div></div>'
+      +'<div style="text-align:right"><div style="font-family:var(--font);font-size:18px;font-weight:800;color:var(--green)">'+fmt(q.total)+'</div>'
+      +'<span class="quote-status '+(statusMap[q.status]||'pending')+'">'+(statusLabel[q.status]||'Pendiente')+'</span></div></div>'
+      +'<div style="font-size:12px;color:var(--text2);margin-bottom:10px">'+(q.items||[]).map(function(i){ return i.qty+'× '+esc(i.name); }).join(' · ')+'</div>'
+      +'<div class="quote-actions">'
+      +'<button class="btn btn-whatsapp" data-qid="'+q.id+'" data-action="send">📲 Enviar</button>'
+      +(q.status==='pending'?'<button class="btn btn-success" data-qid="'+q.id+'" data-action="accept">✅ Aceptar</button>':'')
+      +(q.status==='pending'?'<button class="btn btn-danger" data-qid="'+q.id+'" data-action="reject">✕ Rechazar</button>':'')
+      +'</div></div>';
+  }).join('');
+}
+function buildQuoteFromCart() {
+  if (!state.cart.length) { toast('El carrito esta vacio','warning'); return; }
+  showBottomSheet('Nuevo Presupuesto',
+    '<div class="form-group"><label>Cliente *</label><input type="text" id="qClientName" placeholder="Nombre del cliente"></div>'
+    +'<div class="form-group"><label>Telefono</label><input type="tel" id="qClientPhone" placeholder="+56 9..."></div>'
+    +'<div class="form-group"><label>Validez</label><select id="qValidity"><option value="3">3 dias</option><option value="7" selected>7 dias</option><option value="15">15 dias</option><option value="30">30 dias</option></select></div>'
+    +'<div class="form-group"><label>Notas</label><textarea id="qNotes" rows="2"></textarea></div>'
+    +'<div class="form-actions"><button id="saveQuoteBtn" class="btn btn-primary">Guardar y enviar</button><button id="cancelQuoteBtn" class="btn btn-outline">Cancelar</button></div>'
+  );
+  setTimeout(function(){
+    var s=document.getElementById('saveQuoteBtn');
+    if(s) s.addEventListener('click', function(){
+      var name=document.getElementById('qClientName').value.trim();
+      if(!name){ toast('Nombre requerido','warning'); return; }
+      var sub=state.cart.reduce(function(s,i){ return s+i.salePrice*i.qty; },0);
+      var disc=parseFloat(el('discountInput').value)||0;
+      var total=sub*(1-disc/100);
+      var id='COT-'+Date.now();
+      var q={ id:id, clientName:name, clientPhone:document.getElementById('qClientPhone').value.trim(),
+        items:state.cart.map(function(i){ return {name:i.name,qty:i.qty,price:i.salePrice}; }),
+        subtotal:sub, discount:disc, total:total,
+        validity:document.getElementById('qValidity').value,
+        notes:document.getElementById('qNotes').value.trim(),
+        date:new Date().toLocaleDateString('es-CL'), status:'pending' };
+      var quotes=getLocalQuotes(); quotes.unshift(q); saveLocalQuotes(quotes);
+      logActivity('product','Presupuesto: '+id+' para '+name);
+      sendQuoteWhatsApp(q); closeBottomSheet(); toast('Presupuesto guardado','success');
+    });
+    var c=document.getElementById('cancelQuoteBtn'); if(c) c.addEventListener('click', closeBottomSheet);
+  }, 100);
+}
+function sendQuoteWhatsApp(q) {
+  var biz=(state.settings&&state.settings.businessName)||'nuestro negocio';
+  var lines=['Presupuesto '+q.id,'Negocio: '+biz,'','Cliente: '+q.clientName,'Fecha: '+q.date+' - Validez: '+q.validity+' dias','','Detalle:'];
+  (q.items||[]).forEach(function(i){ lines.push('  '+i.qty+'x '+i.name+' - '+fmt(i.price*i.qty)); });
+  lines.push(''); if(q.discount>0) lines.push('Descuento: '+q.discount+'%');
+  lines.push('TOTAL: '+fmt(q.total));
+  if(q.notes) lines.push('Notas: '+q.notes);
+  var phone=q.clientPhone||'';
+  var msg=encodeURIComponent(lines.join('\n'));
+  window.open((phone?'https://wa.me/'+phone.replace(/[^0-9]/g,'')+'?text='+msg:'https://wa.me/?text='+msg),'_blank');
+}
+function updateQuoteStatus(qid,status) {
+  var quotes=getLocalQuotes(); var q=quotes.find(function(x){ return x.id===qid; });
+  if(q){ q.status=status; saveLocalQuotes(quotes); loadQuotesSection(); }
+}
+
+// ============ KITS ============
+function loadKitsSection() {
+  gasCall('getKits').then(function(res){
+    if(!res.success) return;
+    var list=document.getElementById('kitsList');
+    if(!list) return;
+    var kits=res.data||[];
+    if(!kits.length){ list.innerHTML='<div class="empty-state" style="grid-column:span 3"><span>🧩</span><p>Sin kits</p></div>'; return; }
+    list.innerHTML=kits.map(function(k){
+      return '<div class="product-card"><div class="product-card-img">🧩</div>'
+        +'<div class="product-card-body"><div class="product-card-name">'+esc(k.name)+'</div>'
+        +'<div class="product-card-price">'+fmt(k.salePrice)+'</div>'
+        +'<div style="font-size:11px;color:var(--text3);margin-top:4px">'+(k.components||[]).length+' componentes</div></div>'
+        +'<div class="product-card-actions"><button class="btn-edit" data-kid="'+k.id+'">Editar</button>'
+        +'<button class="btn-delete" data-kid="'+k.id+'" data-name="'+esc(k.name)+'">🗑</button></div></div>';
+    }).join('');
+  });
+}
+function showAddKitForm() {
+  if(!state.products.length){ toast('Carga el inventario primero','warning'); return; }
+  var opts=state.products.map(function(p){ return '<option value="'+p.id+'">'+esc(p.name)+'</option>'; }).join('');
+  showBottomSheet('Nuevo Kit / Receta',
+    '<div class="form-group"><label>Nombre *</label><input type="text" id="kitName" placeholder="Combo desayuno"></div>'
+    +'<div class="form-row"><div class="form-group"><label>Precio venta *</label><input type="number" id="kitPrice" min="0"></div>'
+    +'<div class="form-group"><label>Stock min</label><input type="number" id="kitMinStock" value="0" min="0"></div></div>'
+    +'<div class="form-group"><label>Componentes</label>'
+    +'<div id="kitComponents"><div class="kit-comp-row" style="display:flex;gap:8px;margin-bottom:8px">'
+    +'<select class="kit-comp-select" style="flex:1;padding:10px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text)">'+opts+'</select>'
+    +'<input type="number" class="kit-comp-qty" value="1" min="1" style="width:70px;padding:10px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text)">'
+    +'</div></div>'
+    +'<button id="addKitCompBtn" class="btn btn-outline btn-sm">+ Agregar</button></div>'
+    +'<div class="form-actions" style="margin-top:16px"><button id="saveKitBtn" class="btn btn-primary">Guardar</button><button id="cancelKitBtn" class="btn btn-outline">Cancelar</button></div>'
+  );
+  setTimeout(function(){
+    var addBtn=document.getElementById('addKitCompBtn');
+    if(addBtn) addBtn.addEventListener('click', function(){
+      var row=document.createElement('div'); row.className='kit-comp-row'; row.style.cssText='display:flex;gap:8px;margin-bottom:8px';
+      row.innerHTML='<select class="kit-comp-select" style="flex:1;padding:10px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text)">'+opts+'</select>'
+        +'<input type="number" class="kit-comp-qty" value="1" min="1" style="width:70px;padding:10px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text)">'
+        +'<button style="background:var(--red-bg);color:var(--red);border:none;border-radius:8px;padding:0 10px;cursor:pointer" onclick="this.parentElement.remove()">x</button>';
+      document.getElementById('kitComponents').appendChild(row);
+    });
+    var save=document.getElementById('saveKitBtn');
+    if(save) save.addEventListener('click', function(){
+      var name=document.getElementById('kitName').value.trim();
+      var price=parseFloat(document.getElementById('kitPrice').value)||0;
+      if(!name||!price){ toast('Nombre y precio requeridos','warning'); return; }
+      var components=[];
+      document.querySelectorAll('.kit-comp-row').forEach(function(row){
+        var sel=row.querySelector('.kit-comp-select'); var qty=row.querySelector('.kit-comp-qty');
+        if(sel&&qty){ var p=state.products.find(function(x){ return x.id===sel.value; });
+          if(p) components.push({ productId:sel.value, productName:p.name, qty:parseInt(qty.value)||1 }); }
+      });
+      if(!components.length){ toast('Agrega componentes','warning'); return; }
+      showLoading('Guardando...');
+      gasCall('createKit',{ name:name, salePrice:price, minStock:parseInt(document.getElementById('kitMinStock').value)||0, components:components })
+        .then(function(res){ if(res.success){ toast('Kit creado','success'); closeBottomSheet(); loadKitsSection(); } else toast(res.message||'Error','error'); })
+        .finally(hideLoading);
+    });
+    var c=document.getElementById('cancelKitBtn'); if(c) c.addEventListener('click', closeBottomSheet);
+  }, 100);
+}
+
+// ============ ACTIVITY LOG ============
+function logActivity(type, msg) {
+  var key='stockapp_activity';
+  var log=getActivityLog();
+  log.unshift({ type:type, msg:msg, user:state.currentUser?state.currentUser.name:'Sistema', ts:new Date().toLocaleString('es-CL') });
+  if(log.length>500) log=log.slice(0,500);
+  try{ localStorage.setItem(key, JSON.stringify(log)); }catch(e){}
+}
+function getActivityLog() { try{ return JSON.parse(localStorage.getItem('stockapp_activity')||'[]'); }catch(e){ return []; } }
+function loadActivitySection() {
+  var log=getActivityLog();
+  var list=document.getElementById('activityList'); if(!list) return;
+  var searchEl=document.getElementById('activitySearch');
+  var q=searchEl?(searchEl.value||'').toLowerCase():'';
+  var filtered=q?log.filter(function(i){ return i.msg.toLowerCase().includes(q)||i.user.toLowerCase().includes(q); }):log;
+  if(!filtered.length){ list.innerHTML='<div class="empty-state"><span>📋</span><p>Sin actividad</p></div>'; return; }
+  list.innerHTML=filtered.map(function(item){
+    return '<div class="activity-item"><div class="activity-dot '+(item.type||'sale')+'"></div>'
+      +'<div class="activity-info"><div class="activity-msg">'+esc(item.msg)+'</div>'
+      +'<div class="activity-meta">'+esc(item.user)+' · '+esc(item.ts)+'</div></div></div>';
+  }).join('');
+}
+
+// ============ SALE CHANNEL ============
+function setSaleChannel(channel) {
+  state.saleChannel = channel;
+  document.querySelectorAll('.channel-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.channel===channel); });
+}
+
+// ============ RESTOCK ALERTS ============
+function checkRestockAlerts() {
+  var alertPhone=state.settings&&state.settings.alertPhone;
+  if(!alertPhone) return;
+  var lowProds=state.products.filter(function(p){ return parseInt(p.stock)<=parseInt(p.minStock||0)&&parseInt(p.minStock||0)>0; });
+  if(!lowProds.length) return;
+  var lastAlert=localStorage.getItem('stockapp_last_alert');
+  var today=new Date().toDateString();
+  if(lastAlert===today) return;
+  localStorage.setItem('stockapp_last_alert', today);
+  var biz=(state.settings&&state.settings.businessName)||'tu negocio';
+  var lines=['Alerta de Stock — '+biz,''];
+  lines.push('Productos que necesitan reabastecimiento:');
+  lowProds.slice(0,10).forEach(function(p){ lines.push('  - '+p.name+' (stock: '+p.stock+' / min: '+p.minStock+')'); });
+  window.open('https://wa.me/'+alertPhone.replace(/[^0-9]/g,'')+'?text='+encodeURIComponent(lines.join('\n')),'_blank');
+}
+
+// ============ AUTO BACKUP ============
+function initAutoBackup() {
+  var enabled=localStorage.getItem('stockapp_autobackup')==='1';
+  var toggle=document.getElementById('autoBackupToggle');
+  if(toggle) toggle.checked=enabled;
+  if(enabled){
+    var lastBackup=localStorage.getItem('stockapp_last_backup');
+    var today=new Date().toDateString();
+    if(lastBackup!==today){
+      localStorage.setItem('stockapp_last_backup', today);
+      setTimeout(function(){
+        gasCall('createBackup').then(function(res){
+          if(res.success){ toast('Respaldo automatico creado','success',2000); logActivity('product','Respaldo automatico'); }
+        });
+      }, 5000);
+    }
+  }
+}
+
+// ============ CATALOG LINK ============
+function showQRCatalog() {
+  var nid = state.currentUser && state.currentUser.negocio_id;
+  var base = window.location.href.split('?')[0].split('#')[0];
+  var autoUrl = nid ? base + '?pedido=1&nid=' + nid : '';
+  var biz = (state.settings && state.settings.businessName) || 'Mi Negocio';
+  showBottomSheet('Link del Catalogo',
+    '<div style="padding:4px 0">'
+    +'<div style="background:var(--green-bg);border:1px solid rgba(16,217,126,0.2);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;font-size:13px;color:var(--green);">'
+    +'Tu link de catalogo generado automaticamente.</div>'
+    +'<div style="background:var(--bg2);border:1.5px solid var(--accent);border-radius:var(--r);padding:14px;margin-bottom:12px">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Tu link</div>'
+    +'<div id="catalogLinkText" style="font-size:12px;color:var(--accent2);word-break:break-all;font-family:monospace;line-height:1.6">'+autoUrl+'</div>'
+    +'</div>'
+    +'<div style="display:flex;gap:10px">'
+    +'<button id="copyQRLink" class="btn btn-outline" style="flex:1">Copiar</button>'
+    +'<button id="shareQRLink" class="btn btn-whatsapp" style="flex:1">Compartir WA</button>'
+    +'</div></div>'
+  );
+  setTimeout(function(){
+    var linkText=document.getElementById('catalogLinkText');
+    var copyBtn=document.getElementById('copyQRLink');
+    if(copyBtn) copyBtn.addEventListener('click', function(){
+      var url=linkText?linkText.textContent:'';
+      var ta=document.createElement('textarea'); ta.value=url;
+      ta.style.position='fixed'; ta.style.top='-9999px';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      try{ document.execCommand('copy'); toast('Copiado!','success'); }catch(e){ prompt('Copia este link:', url); }
+      document.body.removeChild(ta);
+    });
+    var shareBtn=document.getElementById('shareQRLink');
+    if(shareBtn) shareBtn.addEventListener('click', function(){
+      var url=linkText?linkText.textContent:'';
+      var msg='Hola! Te comparto el catalogo de *'+biz+'*.\n\nVe los productos y enviame tu pedido:\n'+url+'\n\nGracias!';
+      if(navigator.share){ navigator.share({ title:'Catalogo '+biz, url:url }).catch(function(){ window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank'); }); }
+      else { window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank'); }
+    });
+  }, 150);
+}
+
 // ============ EVENT BINDING ============// ============ EVENT BINDING ============
 document.addEventListener('DOMContentLoaded', function() {
 
