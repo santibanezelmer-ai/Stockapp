@@ -1356,13 +1356,19 @@ body.desktop-mode .toast-container { bottom: 20px; left: 50%; transform: transla
       <div class="card">
         <h3>🏪 Mi Negocio</h3>
         <div class="settings-logo-row">
-          <div id="logoPreview" class="logo-preview">
+          <div id="logoPreview" class="logo-preview" id="logoPreviewEl" style="cursor:pointer" title="Toca para cambiar logo">
             <img id="topLogoImg" style="display:none;width:100%;height:100%;object-fit:contain;border-radius:8px">
             <span id="logoPlaceholder">📦</span>
           </div>
           <div style="flex:1">
-            <div class="form-group" style="margin-bottom:8px"><label>URL del logo</label><input type="url" id="settingLogoUrl" placeholder="https://... (imagen)"></div>
-            <button id="applyLogoBtn" class="btn btn-outline btn-sm">Aplicar logo</button>
+            <div style="font-size:13px;color:var(--text2);margin-bottom:10px">Sube una imagen desde tu dispositivo o pega una URL</div>
+            <input type="file" id="logoFileInput" accept="image/*" style="display:none">
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button id="uploadLogoBtn" class="btn btn-primary btn-sm">📁 Subir imagen</button>
+              <button id="urlLogoBtn" class="btn btn-outline btn-sm">🔗 Usar URL</button>
+              <button id="removeLogoBtn" class="btn btn-outline btn-sm" style="color:var(--red)">✕ Quitar</button>
+            </div>
+            <input type="url" id="settingLogoUrl" placeholder="https://... (opcional)" style="display:none;width:100%;margin-top:8px;padding:10px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
           </div>
         </div>
         <div class="form-group"><label>Nombre del negocio</label><input type="text" id="settingBusinessName" placeholder="Ej: Minimarket Ana"></div>
@@ -4949,13 +4955,82 @@ document.addEventListener('DOMContentLoaded', function() {
       .then(function(res){ if(res.success) toast('Apariencia guardada','success'); else toast('Error','error'); })
       .finally(hideLoading);
   });
-  // Apply logo preview
-  var applyLogoBtn = document.getElementById('applyLogoBtn');
-  if (applyLogoBtn) applyLogoBtn.addEventListener('click', function(){
-    var url = document.getElementById('settingLogoUrl').value.trim();
-    if (!url) return;
+  // Logo system
+  function applyLogoPreview(src) {
     var img = document.getElementById('topLogoImg');
-    if (img) { img.src = url; img.style.display = 'block'; document.getElementById('logoPlaceholder').style.display = 'none'; }
+    var ph  = document.getElementById('logoPlaceholder');
+    var topImg = document.getElementById('topLogoImg');
+    if (!src) {
+      if(img){ img.style.display='none'; img.src=''; }
+      if(ph) ph.style.display='block';
+      return;
+    }
+    if(img){ img.src=src; img.style.display='block'; }
+    if(ph) ph.style.display='none';
+    // Also update topbar logo if exists
+    if(topImg && topImg !== img){ topImg.src=src; topImg.style.display='block'; }
+  }
+
+  var uploadLogoBtn = document.getElementById('uploadLogoBtn');
+  var logoFileInput = document.getElementById('logoFileInput');
+  var urlLogoBtn    = document.getElementById('urlLogoBtn');
+  var removeLogoBtn = document.getElementById('removeLogoBtn');
+  var logoUrlInput  = document.getElementById('settingLogoUrl');
+  var logoPreviewEl = document.getElementById('logoPreview');
+
+  // Click preview or upload button → open file picker
+  if (logoPreviewEl) logoPreviewEl.addEventListener('click', function(){ if(logoFileInput) logoFileInput.click(); });
+  if (uploadLogoBtn) uploadLogoBtn.addEventListener('click', function(){ if(logoFileInput) logoFileInput.click(); });
+
+  // File selected → convert to base64 → preview + save
+  if (logoFileInput) logoFileInput.addEventListener('change', function(){
+    var file = this.files[0];
+    if (!file) return;
+    // Check size (max 500KB)
+    if (file.size > 500*1024) {
+      toast('Imagen muy grande. Máximo 500KB','warning'); return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var base64 = e.target.result;
+      applyLogoPreview(base64);
+      if(logoUrlInput) logoUrlInput.value = base64;
+      // Save immediately
+      showLoading('Guardando logo...');
+      gasCall('saveSettings', Object.assign({}, state.settings, { logoUrl: base64 }))
+        .then(function(res){
+          if(res.success){ state.settings.logoUrl=base64; toast('Logo guardado','success'); }
+          else toast('Error al guardar logo','error');
+        }).finally(hideLoading);
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // URL button → show URL input
+  if (urlLogoBtn) urlLogoBtn.addEventListener('click', function(){
+    if(!logoUrlInput) return;
+    var visible = logoUrlInput.style.display !== 'none';
+    logoUrlInput.style.display = visible ? 'none' : 'block';
+    if(!visible) {
+      logoUrlInput.focus();
+      logoUrlInput.addEventListener('change', function(){
+        var url = this.value.trim();
+        if(url) { applyLogoPreview(url);
+          gasCall('saveSettings', Object.assign({}, state.settings, { logoUrl: url }))
+            .then(function(res){ if(res.success){ state.settings.logoUrl=url; toast('Logo guardado','success'); } });
+        }
+      }, { once: true });
+    }
+  });
+
+  // Remove logo
+  if (removeLogoBtn) removeLogoBtn.addEventListener('click', function(){
+    applyLogoPreview('');
+    if(logoUrlInput) logoUrlInput.value='';
+    showLoading('Quitando logo...');
+    gasCall('saveSettings', Object.assign({}, state.settings, { logoUrl: '' }))
+      .then(function(res){ if(res.success){ state.settings.logoUrl=''; toast('Logo eliminado','success'); } })
+      .finally(hideLoading);
   });
   // Save finance settings
   var saveFinanceBtn = document.getElementById('saveFinanceBtn');
