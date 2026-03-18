@@ -1788,8 +1788,185 @@ document.addEventListener('DOMContentLoaded',()=>{
   $('rmLogoBtn').addEventListener('click',()=>{$('logoImg').classList.add('hidden');$('logoImg').src='';$('logoPlaceholder').classList.remove('hidden');$('topLogo').innerHTML='⚡';$('logoUrlInp').value='';saveCfg({logo_url:''});});
 });
 
+// ═══════════════════════════════════════════════════
+// VARIANTS
+// ═══════════════════════════════════════════════════
+function renderVarGroupsHTML(variants){
+  if(!variants)return'';
+  let v=variants;
+  if(typeof v==='string'){try{v=JSON.parse(v);}catch{return'';}}
+  if(!Array.isArray(v))return'';
+  return v.map((g,gi)=>`<div class="var-input-row" data-gi="${gi}"><input type="text" class="var-group-name" placeholder="Nombre grupo (ej: Talla)" value="${esc(g.name||'')}" style="max-width:140px"><input type="text" class="var-group-vals" placeholder="Valores separados por coma (ej: S,M,L)" value="${esc((g.values||[]).join(','))}"><button type="button" class="var-del" onclick="removeVarGroup(${gi})">✕</button></div>`).join('');
+}
+
+function addVarGroup(){
+  const container=document.getElementById('varGroups');if(!container)return;
+  const gi=container.querySelectorAll('.var-input-row').length;
+  const div=document.createElement('div');
+  div.className='var-input-row';div.dataset.gi=gi;
+  div.innerHTML=`<input type="text" class="var-group-name" placeholder="Nombre grupo (ej: Talla)" style="max-width:140px"><input type="text" class="var-group-vals" placeholder="Valores separados por coma (ej: S,M,L)"><button type="button" class="var-del" onclick="this.closest('.var-input-row').remove()">✕</button>`;
+  container.appendChild(div);
+  div.querySelector('.var-group-name').focus();
+}
+
+function removeVarGroup(gi){
+  const container=document.getElementById('varGroups');if(!container)return;
+  const rows=container.querySelectorAll('.var-input-row');
+  if(rows[gi])rows[gi].remove();
+}
+
+function collectVariants(){
+  const container=document.getElementById('varGroups');if(!container)return[];
+  const rows=container.querySelectorAll('.var-input-row');
+  const variants=[];
+  rows.forEach(row=>{
+    const name=(row.querySelector('.var-group-name')?.value||'').trim();
+    const vals=(row.querySelector('.var-group-vals')?.value||'').split(',').map(v=>v.trim()).filter(Boolean);
+    if(name&&vals.length)variants.push({name,values:vals});
+  });
+  return variants;
+}
+
+function showVariantPicker(p,onSelect){
+  if(!p.variants)return onSelect(p,null);
+  let variants=p.variants;
+  if(typeof variants==='string'){try{variants=JSON.parse(variants);}catch{return onSelect(p,null);}}
+  if(!Array.isArray(variants)||!variants.length)return onSelect(p,null);
+  const selected={};
+  const renderSel=()=>{
+    const body=document.getElementById('varPickBody');if(!body)return;
+    body.innerHTML=variants.map(g=>`<div class="var-section"><div class="var-section-label">${esc(g.name)}</div><div>${(g.values||[]).map(v=>`<button type="button" class="var-tag${selected[g.name]===v?' active':''}" onclick="varPickSel('${esc(g.name)}','${esc(v)}')">${esc(v)}</button>`).join('')}</div></div>`).join('');
+  };
+  openModal('Variante — '+esc(p.name),`<div id="varPickBody"></div>`,
+    `<button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" id="varConfirmBtn">✓ Agregar</button>`);
+  renderSel();
+  window._varState={selected,variants,renderSel,onSelect,p};
+  document.getElementById('varConfirmBtn').addEventListener('click',()=>{
+    const allSel=variants.every(g=>selected[g.name]);
+    if(!allSel){toast('Selecciona todas las opciones','warn');return;}
+    const label=Object.values(selected).join(' / ');
+    closeModal();onSelect(p,label);
+  });
+}
+
+function varPickSel(group,value){
+  if(!window._varState)return;
+  window._varState.selected[group]=value;
+  window._varState.renderSel();
+}
+
+function addToCartWithVariant(p,varLabel){
+  const displayName=varLabel?`${p.name} (${varLabel})`:p.name;
+  const key=varLabel?`${p.id}__${varLabel}`:p.id;
+  const existing=S.cart.findIndex(i=>i._key===key);
+  if(existing>=0)S.cart[existing].qty++;
+  else S.cart.push({id:p.id,_key:key,name:displayName,price:p.price,cost:p.cost,qty:1,unit:p.unit||'unidad',variant:varLabel});
+  updateCart();renderProdGrid($('salesSearch').value);
+}
+
+// ═══════════════════════════════════════════════════
+// UNIT QUANTITY PICKER
+// ═══════════════════════════════════════════════════
+function showUnitQtyPicker(p){
+  openModal('Agregar — '+esc(p.name),
+    `<div style="text-align:center;margin-bottom:16px">
+       ${p.img?`<img src="${esc(p.img)}" style="width:80px;height:80px;object-fit:cover;border-radius:var(--r);margin-bottom:8px">`:'<div style="font-size:48px;margin-bottom:8px">📦</div>'}
+       <div style="font-size:15px;font-weight:700">${esc(p.name)}</div>
+       <div style="font-family:var(--mono);font-size:20px;font-weight:800;color:var(--green);margin-top:4px">${fmt(p.price)} / ${p.unit}</div>
+     </div>
+     <div class="unit-qty-row">
+       <span class="unit-qty-label">Cantidad:</span>
+       <input type="number" class="unit-qty-inp" id="unitQtyInp" value="1" min="0.01" step="0.01">
+       <span class="unit-qty-unit">${p.unit}</span>
+     </div>
+     <div id="unitQtyTotal" style="text-align:center;font-family:var(--mono);font-size:22px;font-weight:800;color:var(--accent2);padding:8px">${fmt(p.price)}</div>`,
+    `<button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" id="unitQtyConfirmBtn">+ Agregar</button>`
+  );
+  const inp=document.getElementById('unitQtyInp');
+  const tot=document.getElementById('unitQtyTotal');
+  inp.addEventListener('input',()=>{const q=parseFloat(inp.value)||0;tot.textContent=fmt(p.price*q);});
+  inp.select();
+  document.getElementById('unitQtyConfirmBtn').addEventListener('click',()=>{
+    const qty=parseFloat(inp.value)||0;
+    if(qty<=0){toast('Ingresa una cantidad válida','warn');return;}
+    closeModal();addToCartWithQty(p.id,qty);
+  });
+}
+
+function addToCartWithQty(pid,qty){
+  const p=S.products.find(p=>p.id===pid);if(!p)return;
+  if(p.stock<=0){toast('Sin stock','warn');return;}
+  const existing=S.cart.findIndex(i=>i.id===pid&&!i.variant);
+  if(existing>=0)S.cart[existing].qty=parseFloat((S.cart[existing].qty+qty).toFixed(3));
+  else S.cart.push({id:p.id,_key:p.id,name:p.name,price:p.price,cost:p.cost,qty,unit:p.unit});
+  updateCart();renderProdGrid($('salesSearch').value);
+  toast(qty+' '+p.unit+' agregado','success',1500);
+}
+
+// ═══════════════════════════════════════════════════
+// PRICE HISTORY
+// ═══════════════════════════════════════════════════
+async function showPriceHistory(pid,pname){
+  showLoad();
+  const r=await sb(`/rest/v1/historial_precios?producto_id=eq.${pid}&order=created_at.desc&limit=30`);
+  hideLoad();
+  const items=r.data||[];
+  openModal('📈 Historial — '+esc(pname),
+    !items.length
+      ? '<div class="empty-state"><div class="icon">📈</div><p>Sin historial registrado.<br><small>Los cambios de precio se guardan automáticamente.</small></p></div>'
+      : `<div class="data-list">${items.map(h=>`<div class="price-hist-item"><div><div style="font-weight:700">${fmt(h.precio_venta)}</div><div style="font-size:11px;color:var(--text2)">${fmtDT(h.created_at)} · ${esc(h.usuario||'Sistema')}</div></div><div style="text-align:right"><div style="font-size:11px;color:var(--text2)">Costo: ${fmt(h.precio_costo)}</div>${h.precio_anterior?`<div style="font-size:11px;color:${parseFloat(h.precio_venta)>=parseFloat(h.precio_anterior)?'var(--green)':'var(--red)'}">${parseFloat(h.precio_venta)>=parseFloat(h.precio_anterior)?'↑':'↓'} antes: ${fmt(h.precio_anterior)}</div>`:''}</div></div>`).join('')}</div>`
+  );
+}
+
+async function savePriceToHistory(pid,newPrice,oldPrice,newCost){
+  try{await sb('/rest/v1/historial_precios',{method:'POST',body:JSON.stringify({producto_id:pid,negocio_id:S.user.nid,precio_venta:newPrice,precio_costo:newCost||0,precio_anterior:oldPrice||null,usuario:S.user.name})});}catch(e){}
+}
+
+// ═══════════════════════════════════════════════════
+// DEVOLUTIONS
+// ═══════════════════════════════════════════════════
+let devFilter='all';
+
+async function loadDevolutions(){
+  if(!S.user)return;
+  const nid=S.user.nid;
+  const month=new Date().toISOString().slice(0,7);
+  const r=await sb(`/rest/v1/devoluciones?negocio_id=eq.${nid}&order=created_at.desc`);
+  const items=r.data||[];
+  const filtered=devFilter==='all'?items:items.filter(d=>d.tipo===devFilter);
+  const total=items.reduce((s,d)=>s+parseFloat(d.monto||0),0);
+  const monthCount=items.filter(d=>d.created_at&&d.created_at.slice(0,7)===month).length;
+  $('devTotal').textContent=fmt(total);$('devMonth').textContent=monthCount;
+  const el=$('devList');
+  if(!filtered.length){el.innerHTML='<div class="empty-state"><div class="icon">↩️</div><p>Sin devoluciones registradas</p></div>';return;}
+  el.innerHTML=filtered.map(d=>`<div class="data-item"><div class="d-icon" style="background:var(--ybg)">↩️</div><div class="d-info"><div class="d-title">${esc(d.motivo||'Sin motivo')} <span class="dev-badge">${d.tipo==='anulacion'?'Anulación':'Devolución'}</span></div><div class="d-sub">${fmtDT(d.created_at)} · ${esc(d.descripcion||'')}${d.venta_id?' · Venta #'+(d.venta_id.slice(-6)):''}</div></div><div class="d-right"><div class="d-amount red">-${fmt(d.monto)}</div>${d.stock_restituido?'<div style="font-size:10px;color:var(--green)">✓ Stock restituido</div>':''}</div></div>`).join('');
+}
+
+function showAddDev(){
+  openModal('Registrar Devolución',`
+    <div class="form-group"><label>Tipo</label><select id="devTipo"><option value="devolucion">↩️ Devolución de producto</option><option value="anulacion">❌ Anulación de venta</option></select></div>
+    <div class="form-group"><label>ID de venta (últimos 6 caracteres)</label><input type="text" id="devVentaId" placeholder="abc123" maxlength="6"></div>
+    <div class="form-group"><label>Motivo *</label><input type="text" id="devMotivo" placeholder="Ej: Producto defectuoso" list="devML"><datalist id="devML"><option value="Producto defectuoso"><option value="Error en cobro"><option value="Cliente cambió de opinión"><option value="Producto incorrecto"><option value="Duplicado"></datalist></div>
+    <div class="form-group"><label>Monto *</label><input type="number" id="devMonto" placeholder="0" min="0"></div>
+    <div class="form-group"><label>Descripción</label><input type="text" id="devDesc" placeholder="Detalles"></div>
+    <label style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--bg2);border-radius:var(--r);cursor:pointer">
+      <input type="checkbox" id="devRestStock" style="accent-color:var(--accent)"> Restituir stock al inventario
+    </label>`,
+  `<button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveDevolution()">💾 Registrar</button>`);
+}
+
+async function saveDevolution(){
+  const motivo=$('devMotivo').value.trim(),monto=parseFloat($('devMonto').value)||0;
+  if(!motivo||!monto){toast('Motivo y monto requeridos','warn');return;}
+  showLoad();
+  const r=await sb('/rest/v1/devoluciones',{method:'POST',body:JSON.stringify({negocio_id:S.user.nid,tipo:$('devTipo').value,motivo,monto,descripcion:$('devDesc').value.trim(),venta_id:$('devVentaId').value.trim()||null,stock_restituido:$('devRestStock').checked,usuario_id:S.user.id})});
+  hideLoad();
+  if(r.ok){toast('Registrado','success');closeModal();loadDevolutions();}
+  else toast('Error al guardar','error');
+}
+
 // Globals for inline onclick
-window.closeModal=closeModal;window.addVarGroup=addVarGroup;window.removeVarGroup=removeVarGroup;window.varPick=varPick;window.showAddDev=showAddDev;window.saveDevolution=saveDevolution;window.shareRec=shareRec;window.catQty=catQty;window.saveCFMove=saveCFMove;window.doPayDebt=doPayDebt;window.savePayable=savePayable;window.saveClient=saveClient;window.saveProd=saveProd;window.saveEntry=saveEntry;window.saveUser=saveUser;window.saveDebt=saveDebt;window.savePurchase=savePurchase;window.sendOrder=sendOrder;window.copyTxt=copyTxt;window.shareWA=shareWA;window.runImport=runImport;
+window.closeModal=closeModal;window.addVarGroup=addVarGroup;window.removeVarGroup=removeVarGroup;window.varPickSel=varPickSel;window.showAddDev=showAddDev;window.saveDevolution=saveDevolution;window.shareRec=shareRec;window.catQty=catQty;window.saveCFMove=saveCFMove;window.doPayDebt=doPayDebt;window.savePayable=savePayable;window.saveClient=saveClient;window.saveProd=saveProd;window.saveEntry=saveEntry;window.saveUser=saveUser;window.saveDebt=saveDebt;window.savePurchase=savePurchase;window.sendOrder=sendOrder;window.copyTxt=copyTxt;window.shareWA=shareWA;window.runImport=runImport;
 </script>
 </body>
 </html>
