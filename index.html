@@ -1214,16 +1214,64 @@ function renderInv(){
 
 function showProdForm(p=null){
   const units=['unidad','kg','g','lb','m','cm','m2','l','ml','caja','pack','docena'];
+  // Parse existing variants
+  let existingVars=[];
+  if(p?.variants){try{existingVars=typeof p.variants==='string'?JSON.parse(p.variants):p.variants;}catch{}}
+  const varRowsHTML=existingVars.map((g,i)=>buildVarRowHTML(g,i)).join('');
+
   openModal(p?'Editar Producto':'Nuevo Producto',`
     <div class="form-group"><label>Nombre *</label><input type="text" id="pN" value="${esc(p?.name||'')}"></div>
-    <div class="form-row"><div class="form-group"><label>Categoría</label><input type="text" id="pC" value="${esc(p?.cat||'')}"></div><div class="form-group"><label>Proveedor</label><input type="text" id="pS" value="${esc(p?.supplier||'')}"></div></div>
-    <div class="form-row"><div class="form-group"><label>Precio Costo</label><input type="number" id="pCo" value="${p?.cost||''}" min="0" step="0.01"></div><div class="form-group"><label>Precio Venta *</label><input type="number" id="pP" value="${p?.price||''}" min="0" step="0.01"></div></div>
-    <div class="form-row"><div class="form-group"><label>Stock</label><input type="number" id="pSt" value="${p?.stock||0}" min="0"></div><div class="form-group"><label>Stock mínimo</label><input type="number" id="pMs" value="${p?.minStock||5}" min="0"></div></div>
-    <div class="form-row"><div class="form-group"><label>Unidad</label><select id="pU">${units.map(u=>`<option value="${u}"${p?.unit===u?' selected':''}>${u}</option>`).join('')}</select></div><div class="form-group"><label>Qty mínima</label><input type="number" id="pMq" value="${p?.minQty||1}" min="0.01" step="0.01"></div></div>
-    <div class="form-group"><label>Código barras</label><input type="text" id="pBc" value="${esc(p?.code||'')}"></div>
-    <div class="form-group"><label>URL imagen</label><input type="url" id="pIm" value="${esc(p?.img||'')}"></div>
-    <div class="form-group"><label>Notas</label><textarea id="pNo" rows="2">${esc(p?.notes||'')}</textarea></div>`,
+    <div class="form-row">
+      <div class="form-group"><label>Categoría</label><input type="text" id="pC" value="${esc(p?.cat||'')}"></div>
+      <div class="form-group"><label>Proveedor</label><input type="text" id="pS" value="${esc(p?.supplier||'')}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Precio Costo</label><input type="number" id="pCo" value="${p?.cost||''}" min="0" step="0.01"></div>
+      <div class="form-group"><label>Precio Venta *</label><input type="number" id="pP" value="${p?.price||''}" min="0" step="0.01"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Stock</label><input type="number" id="pSt" value="${p?.stock||0}" min="0"></div>
+      <div class="form-group"><label>Stock mínimo</label><input type="number" id="pMs" value="${p?.minStock||5}" min="0"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Unidad de medida</label><select id="pU">${units.map(u=>`<option value="${u}"${p?.unit===u?' selected':''}>${u}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Cantidad mínima</label><input type="number" id="pMq" value="${p?.minQty||1}" min="0.01" step="0.01"></div>
+    </div>
+    <div class="form-group"><label>Código de barras</label><input type="text" id="pBc" value="${esc(p?.code||'')}"></div>
+    <div class="form-group"><label>URL imagen</label><input type="url" id="pIm" value="${esc(p?.img||'')}" placeholder="https://..."></div>
+    <div class="form-group"><label>Notas / Descripción</label><textarea id="pNo" rows="2">${esc(p?.notes||'')}</textarea></div>
+    <!-- VARIANTES -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px;margin-top:4px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px">🏷 Variantes del producto</div>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="addVarGroup()">+ Agregar grupo</button>
+      </div>
+      <div id="varGroups">${varRowsHTML}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">Ej: "Talla" con valores "S, M, L" · "Color" con "Rojo, Azul"<br>Cada valor puede tener su propio código de barras.</div>
+    </div>`,
   `<button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveProd('${p?.id||''}')">💾 Guardar</button>`);
+}
+
+function buildVarRowHTML(g,i){
+  const vals=(g.values||[]).map((v,vi)=>`
+    <div class="var-val-row" style="display:flex;gap:6px;align-items:center;margin-bottom:5px">
+      <input type="text" class="var-val-name" placeholder="Valor (ej: S)" value="${esc(v.name||v||'')}" style="flex:1;padding:7px 10px;background:var(--bg2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;outline:none">
+      <input type="text" class="var-val-code" placeholder="Cód. barras" value="${esc(v.code||'')}" style="width:110px;padding:7px 10px;background:var(--bg2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;outline:none;font-family:var(--mono)">
+      <button type="button" onclick="this.closest('.var-val-row').remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:4px;flex-shrink:0">✕</button>
+    </div>`).join('');
+  return `<div class="var-group-block" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:10px;margin-bottom:8px">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <input type="text" class="var-group-name" placeholder="Nombre del grupo (ej: Talla)" value="${esc(g.name||'')}" style="flex:1;padding:8px 11px;background:var(--surface);border:1.5px solid var(--accent);border-radius:var(--r);color:var(--text);font-size:13px;font-weight:600;outline:none">
+      <button type="button" onclick="this.closest('.var-group-block').remove()" style="background:var(--rbg);border:none;color:var(--red);cursor:pointer;font-size:12px;padding:5px 8px;border-radius:8px;font-weight:700;flex-shrink:0">✕ Grupo</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 110px 24px;gap:4px;margin-bottom:4px;padding:0 2px">
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">Valor</div>
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">Cód. barras</div>
+      <div></div>
+    </div>
+    <div class="var-vals-container">${vals}</div>
+    <button type="button" onclick="addVarValue(this)" style="background:none;border:1px dashed var(--border2);color:var(--text2);cursor:pointer;font-size:12px;padding:5px 10px;border-radius:8px;width:100%;margin-top:4px">+ Agregar valor</button>
+  </div>`;
 }
 
 async function saveProd(id){
@@ -1792,38 +1840,45 @@ document.addEventListener('DOMContentLoaded',()=>{
 // ═══════════════════════════════════════════════════
 // VARIANTS
 // ═══════════════════════════════════════════════════
-function renderVarGroupsHTML(variants){
-  if(!variants)return'';
-  let v=variants;
-  if(typeof v==='string'){try{v=JSON.parse(v);}catch{return'';}}
-  if(!Array.isArray(v))return'';
-  return v.map((g,gi)=>`<div class="var-input-row" data-gi="${gi}"><input type="text" class="var-group-name" placeholder="Nombre grupo (ej: Talla)" value="${esc(g.name||'')}" style="max-width:140px"><input type="text" class="var-group-vals" placeholder="Valores separados por coma (ej: S,M,L)" value="${esc((g.values||[]).join(','))}"><button type="button" class="var-del" onclick="removeVarGroup(${gi})">✕</button></div>`).join('');
-}
-
 function addVarGroup(){
-  const container=document.getElementById('varGroups');if(!container)return;
-  const gi=container.querySelectorAll('.var-input-row').length;
+  const container=document.getElementById('varGroups');
+  if(!container)return;
   const div=document.createElement('div');
-  div.className='var-input-row';div.dataset.gi=gi;
-  div.innerHTML=`<input type="text" class="var-group-name" placeholder="Nombre grupo (ej: Talla)" style="max-width:140px"><input type="text" class="var-group-vals" placeholder="Valores separados por coma (ej: S,M,L)"><button type="button" class="var-del" onclick="this.closest('.var-input-row').remove()">✕</button>`;
-  container.appendChild(div);
-  div.querySelector('.var-group-name').focus();
+  div.innerHTML=buildVarRowHTML({name:'',values:[]},container.querySelectorAll('.var-group-block').length);
+  container.appendChild(div.firstElementChild);
+  div.querySelector&&div.querySelector('.var-group-name')?.focus();
+  // Focus on the new group name input
+  container.lastElementChild?.querySelector('.var-group-name')?.focus();
 }
 
-function removeVarGroup(gi){
-  const container=document.getElementById('varGroups');if(!container)return;
-  const rows=container.querySelectorAll('.var-input-row');
-  if(rows[gi])rows[gi].remove();
+function addVarValue(btn){
+  const container=btn.previousElementSibling;
+  if(!container||!container.classList.contains('var-vals-container'))return;
+  const row=document.createElement('div');
+  row.className='var-val-row';
+  row.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:5px';
+  row.innerHTML=`<input type="text" class="var-val-name" placeholder="Valor (ej: S)" style="flex:1;padding:7px 10px;background:var(--bg2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;outline:none">
+    <input type="text" class="var-val-code" placeholder="Cód. barras" style="width:110px;padding:7px 10px;background:var(--bg2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;outline:none;font-family:var(--mono)">
+    <button type="button" onclick="this.closest('.var-val-row').remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:4px;flex-shrink:0">✕</button>`;
+  container.appendChild(row);
+  row.querySelector('.var-val-name').focus();
 }
 
 function collectVariants(){
-  const container=document.getElementById('varGroups');if(!container)return[];
-  const rows=container.querySelectorAll('.var-input-row');
+  const container=document.getElementById('varGroups');
+  if(!container)return[];
+  const groups=container.querySelectorAll('.var-group-block');
   const variants=[];
-  rows.forEach(row=>{
-    const name=(row.querySelector('.var-group-name')?.value||'').trim();
-    const vals=(row.querySelector('.var-group-vals')?.value||'').split(',').map(v=>v.trim()).filter(Boolean);
-    if(name&&vals.length)variants.push({name,values:vals});
+  groups.forEach(g=>{
+    const name=(g.querySelector('.var-group-name')?.value||'').trim();
+    if(!name)return;
+    const values=[];
+    g.querySelectorAll('.var-val-row').forEach(row=>{
+      const vname=(row.querySelector('.var-val-name')?.value||'').trim();
+      const vcode=(row.querySelector('.var-val-code')?.value||'').trim();
+      if(vname)values.push({name:vname,code:vcode||''});
+    });
+    if(values.length)variants.push({name,values});
   });
   return variants;
 }
@@ -1836,10 +1891,18 @@ function showVariantPicker(p,onSelect){
   const selected={};
   const renderSel=()=>{
     const body=document.getElementById('varPickBody');if(!body)return;
-    body.innerHTML=variants.map(g=>`<div class="var-section"><div class="var-section-label">${esc(g.name)}</div><div>${(g.values||[]).map(v=>`<button type="button" class="var-tag${selected[g.name]===v?' active':''}" onclick="varPickSel('${esc(g.name)}','${esc(v)}')">${esc(v)}</button>`).join('')}</div></div>`).join('');
+    body.innerHTML=variants.map(g=>`
+      <div class="var-section">
+        <div class="var-section-label">${esc(g.name)}</div>
+        <div>${(g.values||[]).map(v=>{
+          const vname=typeof v==='string'?v:(v.name||'');
+          const vcode=typeof v==='object'?v.code||'':'';
+          return `<button type="button" class="var-tag${selected[g.name]===vname?' active':''}" onclick="varPickSel('${esc(g.name)}','${esc(vname)}')">${esc(vname)}${vcode?` <span style="font-size:9px;opacity:0.6;font-family:var(--mono)">${esc(vcode)}</span>`:''}</button>`;
+        }).join('')}</div>
+      </div>`).join('');
   };
-  openModal('Variante — '+esc(p.name),`<div id="varPickBody"></div>`,
-    `<button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" id="varConfirmBtn">✓ Agregar</button>`);
+  openModal('Seleccionar variante',`<div style="margin-bottom:12px"><div style="font-size:15px;font-weight:700">${esc(p.name)}</div><div style="font-family:var(--mono);font-size:14px;color:var(--green)">${fmt(p.price)}</div></div><div id="varPickBody"></div>`,
+    `<button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" id="varConfirmBtn">✓ Agregar al carrito</button>`);
   renderSel();
   window._varState={selected,variants,renderSel,onSelect,p};
   document.getElementById('varConfirmBtn').addEventListener('click',()=>{
@@ -1864,7 +1927,6 @@ function addToCartWithVariant(p,varLabel){
   else S.cart.push({id:p.id,_key:key,name:displayName,price:p.price,cost:p.cost,qty:1,unit:p.unit||'unidad',variant:varLabel});
   updateCart();renderProdGrid($('salesSearch').value);
 }
-
 // ═══════════════════════════════════════════════════
 // UNIT QUANTITY PICKER
 // ═══════════════════════════════════════════════════
@@ -1967,7 +2029,7 @@ async function saveDevolution(){
 }
 
 // Globals for inline onclick
-window.closeModal=closeModal;window.addVarGroup=addVarGroup;window.removeVarGroup=removeVarGroup;window.varPickSel=varPickSel;window.showAddDev=showAddDev;window.saveDevolution=saveDevolution;window.shareRec=shareRec;window.catQty=catQty;window.saveCFMove=saveCFMove;window.doPayDebt=doPayDebt;window.savePayable=savePayable;window.saveClient=saveClient;window.saveProd=saveProd;window.saveEntry=saveEntry;window.saveUser=saveUser;window.saveDebt=saveDebt;window.savePurchase=savePurchase;window.sendOrder=sendOrder;window.copyTxt=copyTxt;window.shareWA=shareWA;window.runImport=runImport;
+window.closeModal=closeModal;window.addVarGroup=addVarGroup;window.addVarValue=addVarValue;window.varPickSel=varPickSel;window.showAddDev=showAddDev;window.saveDevolution=saveDevolution;window.shareRec=shareRec;window.catQty=catQty;window.saveCFMove=saveCFMove;window.doPayDebt=doPayDebt;window.savePayable=savePayable;window.saveClient=saveClient;window.saveProd=saveProd;window.saveEntry=saveEntry;window.saveUser=saveUser;window.saveDebt=saveDebt;window.savePurchase=savePurchase;window.sendOrder=sendOrder;window.copyTxt=copyTxt;window.shareWA=shareWA;window.runImport=runImport;
 </script>
 </body>
 </html>
