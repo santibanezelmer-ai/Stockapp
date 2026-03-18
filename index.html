@@ -1296,9 +1296,17 @@ async function delProd(id,name){
 
 function exportProds(){
   const h='nombre,categoria,proveedor,codigo,precio_costo,precio_venta,stock,stock_minimo,unidad,cantidad_minima';
-  const rows=S.products.map(p=>[p.name,p.cat,p.supplier,p.code,p.cost,p.price,p.stock,p.minStock,p.unit,p.minQty].map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(','));
+  const rows=S.products.map(p=>[
+    p.name,p.cat||'',p.supplier||'',p.code||'',
+    p.cost||0,p.price||0,p.stock||0,p.minStock||3,
+    p.unit||'unidad',p.minQty||1
+  ].map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(','));
   const csv='\uFEFF'+h+'\n'+rows.join('\n');
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='productos_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href);toast('Exportado','success');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download='productos_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();URL.revokeObjectURL(a.href);
+  toast('Exportado '+S.products.length+' productos','success');
 }
 
 function importProds(file){
@@ -1323,9 +1331,36 @@ function importProds(file){
 }
 
 async function runImport(){
-  const prods=window._imp;if(!prods)return;closeModal();showLoad();let ok=0,fail=0;
-  for(const p of prods){const r=await sb('/rest/v1/productos',{method:'POST',body:JSON.stringify({negocio_id:S.user.nid,nombre:p.name,categoria:p.cat||'',proveedor:p.supplier||'',codigo:p.code||'',precio_costo:p.cost,precio_venta:p.price,stock:p.stock,stock_min:p.minStock,unidad:p.unit,cantidad_minima:p.minQty})});if(r.ok)ok++;else fail++;}
-  hideLoad();toast(`Importados: ${ok}${fail?' · Err: '+fail:''}`,ok>0?'success':'error',4000);await loadProds();loadInv();
+  const prods=window._imp;if(!prods)return;closeModal();showLoad();let ok=0,fail=0,firstErr=null;
+  for(const p of prods){
+    const body={
+      negocio_id:S.user.nid,
+      nombre:p.name,
+      categoria:p.cat||'',
+      proveedor:p.supplier||'',
+      codigo:p.code||'',
+      precio_costo:parseFloat(p.cost)||0,
+      precio_venta:parseFloat(p.price)||0,
+      stock:parseInt(p.stock)||0,
+      stock_min:parseInt(p.minStock)||3,
+      unidad:p.unit||'unidad',
+      cantidad_minima:parseFloat(p.minQty)||1,
+      imagen_url:'',
+      notas:''
+    };
+    const r=await sb('/rest/v1/productos',{method:'POST',body:JSON.stringify(body)});
+    if(r.ok)ok++;
+    else{
+      fail++;
+      if(!firstErr)firstErr=JSON.stringify(r.data).slice(0,120);
+      console.error('Import error row',p.name,':',r.status,r.data);
+    }
+  }
+  hideLoad();
+  if(fail&&firstErr)console.warn('First error detail:',firstErr);
+  toast('Importados: '+ok+(fail?' · Errores: '+fail:''),ok>0?'success':'error',4000);
+  if(fail&&!ok)toast('Error Supabase: '+firstErr,'error',6000);
+  await loadProds();loadInv();
 }
 
 function parseCSV(line){const r=[];let c='',q=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){if(q&&line[i+1]==='"'){c+='"';i++;}else q=!q;}else if(ch===','&&!q){r.push(c);c='';}else c+=ch;}r.push(c);return r;}
