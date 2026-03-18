@@ -1068,6 +1068,7 @@ body.desktop-mode .toast-container { bottom: 20px; left: 50%; transform: transla
       <div id="stockAlertBadge" class="alert-badge hidden">
         <span>⚠</span><span id="stockAlertCount">0</span>
       </div>
+      <button id="directLogoutBtn" title="Cerrar sesión" style="background:var(--red-bg);color:var(--red);border:1px solid rgba(255,82,113,0.25);border-radius:var(--r);padding:7px 12px;font-size:13px;cursor:pointer;font-weight:700;display:flex;align-items:center;gap:4px;white-space:nowrap">🚪 Salir</button>
       <div class="user-avatar" id="userAvatarBtn">
         <span id="userInitial">U</span>
       </div>
@@ -4947,6 +4948,137 @@ async function runImport(products) {
   hideLoading();
   toast('Importados: ' + success + (failed?' · Errores: '+failed:''), success > 0 ? 'success' : 'error', 4000);
   loadInventory();
+}
+
+
+// ============ DEBTS (Cobros Pendientes) ============
+var debtsFilter = 'all';
+
+async function loadDebtsSection() {
+  var nid = state.currentUser.negocio_id;
+  var [clients, fiadoSales, manualDebts] = await Promise.all([
+    sbFetch('/rest/v1/clientes?negocio_id=eq.'+nid+'&deuda_total=gt.0&order=deuda_total.desc'),
+    sbFetch('/rest/v1/ventas?negocio_id=eq.'+nid+'&pago=eq.fiado&estado=neq.anulada&order=created_at.desc&select=id,total,created_at,cliente_id'),
+    sbFetch('/rest/v1/deudas?negocio_id=eq.'+nid+'&tipo=eq.deuda&order=created_at.desc&select=*,clientes(nombre,telefono)')
+  ]);
+
+  var clientsWithDebt = clients.data || [];
+  var fiadoList = fiadoSales.data || [];
+  var manualList = manualDebts.data || [];
+
+  var totalPending = clientsWithDebt.reduce(function(s,c){ return s+parseFloat(c.deuda_total||0); }, 0);
+  var el1 = document.getElementById('debtsTotalPending'); if(el1) el1.textContent = fmt(totalPending);
+  var el2 = document.getElementById('debtsClientCount'); if(el2) el2.textContent = clientsWithDebt.length;
+  var el3 = document.getElementById('debtsFiadoCount'); if(el3) el3.textContent = fiadoList.length;
+
+  var items = [];
+  if (debtsFilter === 'all' || debtsFilter === 'fiado') {
+    fiadoList.forEach(function(v){
+      var client = clientsWithDebt.find(function(c){ return c.id === v.cliente_id; });
+      items.push({ type:'fiado', clientName:client?client.nombre:'Sin cliente',
+        clientPhone:client?client.telefono:'', clientId:v.cliente_id,
+        amount:parseFloat(v.total||0), date:new Date(v.created_at).toLocaleDateString('es-CL'),
+        saleId:v.id, totalDebt:client?parseFloat(client.deuda_total||0):0 });
+    });
+  }
+  if (debtsFilter === 'all' || debtsFilter === 'manual') {
+    manualList.forEach(function(d){
+      items.push({ type:'manual', clientName:d.clientes?d.clientes.nombre:'Sin cliente',
+        clientPhone:d.clientes?d.clientes.telefono:'', clientId:d.cliente_id,
+        amount:parseFloat(d.monto||0), date:new Date(d.created_at).toLocaleDateString('es-CL'),
+        debtId:d.id, notas:d.notas||'' });
+    });
+  }
+  items.sort(function(a,b){ return b.amount-a.amount; });
+
+  var list = document.getElementById('debtsList');
+  if (!list) return;
+  if (!items.length) { list.innerHTML='<div class="empty-state"><span>✅</span><p>Sin cobros pendientes</p></div>'; return; }
+
+  list.innerHTML = items.map(function(item){
+    return '<div class="data-item">'
+      +'<div class="data-item-icon" style="background:'+(item.type==='fiado'?'var(--yellow-bg)':'var(--blue-bg)')+'">'+( item.type==='fiado'?'📒':'✍️')+'</div>'
+      +'<div class="data-item-info"><div class="data-item-title">'+esc(item.clientName)
+      +(item.type==='fiado'?'<span style="font-size:10px;background:var(--yellow-bg);color:var(--yellow);padding:2px 8px;border-radius:100px;margin-left:6px;font-weight:700">FIADO</span>':'')
+      +'</div><div class="data-item-subtitle">'+esc(item.date)+(item.totalDebt?'  · Total deuda: '+fmt(item.totalDebt):'')+(item.notas?' · '+esc(item.notas):'')+'</div></div>'
+      +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">'
+      +'<div style="font-family:var(--font);font-size:16px;font-weight:800;color:var(--red)">'+fmt(item.amount)+'</div>'
+      +'<div style="display:flex;gap:6px">'
+      +(item.clientPhone?'<button class="btn btn-sm btn-whatsapp" data-phone="'+esc(item.clientPhone)+'" data-name="'+esc(item.clientName)+'" data-amount="'+item.amount+'" data-action="remindDebt" style="font-size:11px;padding:4px 8px">📲</button>':'')
+      +(item.clientId?'<button class="btn btn-sm" style="background:var(--green-bg);color:var(--green);border:none;font-size:11px;padding:4px 8px" data-cid="'+item.clientId+'" data-action="payDebt">Cobrar</button>':'')
+      +'</div></div></div>';
+  }).join('');
+
+  list.querySelectorAll('[data-action="remindDebt"]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var phone = btn.dataset.phone.replace(/[^0-9]/g,'');
+      var msg = 'Hola '+btn.dataset.name+', le recordamos que tiene una deuda pendiente de '+fmt(parseFloat(btn.dataset.amount))+'. Gracias!';
+      window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank');
+    });
+  });
+  list.querySelectorAll('[data-action="payDebt"]').forEach(function(btn){
+    btn.addEventListener('click', function(){ showDebtPaymentForm(btn.dataset.cid); });
+  });
+}
+
+function showDebtPaymentForm(clientId) {
+  var client = (state.clients||[]).find(function(c){ return c.id===clientId; });
+  var clientName = client ? (client.nombre||client.name||'Cliente') : 'Cliente';
+  var currentDebt = client ? parseFloat(client.deuda_total||0) : 0;
+  showBottomSheet('Registrar Pago — '+clientName,
+    '<div style="background:var(--red-bg);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;font-size:14px;font-weight:700;color:var(--red)">Deuda pendiente: '+fmt(currentDebt)+'</div>'
+    +'<div class="form-group"><label>Monto a pagar *</label><input type="number" id="debtPayAmount" placeholder="$0" min="0" value="'+currentDebt+'"></div>'
+    +'<div class="form-group"><label>Notas</label><input type="text" id="debtPayNotes" placeholder="Ej: Pago en efectivo"></div>'
+    +'<div class="form-actions"><button id="saveDebtPayBtn" class="btn btn-primary">✅ Registrar pago</button><button id="cancelDebtPayBtn" class="btn btn-outline">Cancelar</button></div>'
+  );
+  setTimeout(function(){
+    var s = document.getElementById('saveDebtPayBtn');
+    if(s) s.addEventListener('click', function(){
+      var amount = parseFloat(document.getElementById('debtPayAmount').value)||0;
+      if(!amount){ toast('Ingresa un monto','warning'); return; }
+      showLoading('Registrando...');
+      gasCall('registerDebtPayment',{ clientId:clientId, amount:amount, notes:document.getElementById('debtPayNotes').value })
+        .then(function(res){
+          if(res.success){ toast('Pago registrado','success'); closeBottomSheet(); loadDebtsSection(); loadClients(); }
+          else toast(res.message||'Error','error');
+        }).finally(hideLoading);
+    });
+    var c = document.getElementById('cancelDebtPayBtn'); if(c) c.addEventListener('click', closeBottomSheet);
+  }, 100);
+}
+
+function showAddManualDebt() {
+  var clientOpts = '<option value="">Sin cliente</option>'
+    + (state.clients||[]).map(function(c){ return '<option value="'+c.id+'">'+esc(c.nombre||c.name||'')+'</option>'; }).join('');
+  showBottomSheet('Registrar Deuda Manual',
+    '<div class="form-group"><label>Cliente</label>'
+    +'<select id="manualDebtClient" style="width:100%;padding:12px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:14px">'+clientOpts+'</select></div>'
+    +'<div class="form-group"><label>Monto *</label><input type="number" id="manualDebtAmount" placeholder="$0" min="0"></div>'
+    +'<div class="form-group"><label>Descripción *</label><input type="text" id="manualDebtDesc" placeholder="Ej: Pedido pendiente"></div>'
+    +'<div class="form-actions"><button id="saveManualDebtBtn" class="btn btn-primary">💾 Guardar</button><button id="cancelManualDebtBtn" class="btn btn-outline">Cancelar</button></div>'
+  );
+  setTimeout(function(){
+    var s = document.getElementById('saveManualDebtBtn');
+    if(s) s.addEventListener('click', function(){
+      var amount = parseFloat(document.getElementById('manualDebtAmount').value)||0;
+      var desc   = document.getElementById('manualDebtDesc').value.trim();
+      var cid    = document.getElementById('manualDebtClient').value;
+      if(!amount||!desc){ toast('Monto y descripción requeridos','warning'); return; }
+      showLoading('Guardando...');
+      sbFetch('/rest/v1/deudas', { method:'POST',
+        body: JSON.stringify({ negocio_id:state.currentUser.negocio_id, cliente_id:cid||null, monto:amount, tipo:'deuda', notas:desc })
+      }).then(function(res){
+        if(res.ok){
+          if(cid){
+            var cl = (state.clients||[]).find(function(c){ return c.id===cid; });
+            if(cl) sbFetch('/rest/v1/clientes?id=eq.'+cid,{ method:'PATCH', body:JSON.stringify({ deuda_total:(parseFloat(cl.deuda_total||0)+amount) }) });
+          }
+          toast('Deuda registrada','success'); closeBottomSheet(); loadDebtsSection();
+        } else toast('Error al guardar','error');
+      }).finally(hideLoading);
+    });
+    var c = document.getElementById('cancelManualDebtBtn'); if(c) c.addEventListener('click', closeBottomSheet);
+  }, 100);
 }
 
 // ============ EVENT BINDING ============// ============ EVENT BINDING ============
