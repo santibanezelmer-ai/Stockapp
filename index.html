@@ -817,6 +817,64 @@ body.desktop #toasts{bottom:20px}
   .section{padding:24px 28px}
 }
 
+/* ══ LEGAL ════════════════════════════════════════ */
+.legal-modal{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+.legal-modal.hidden{display:none!important}
+.legal-modal-bg{position:absolute;inset:0;background:oklch(10% 0.012 265 / 0.85);backdrop-filter:blur(8px)}
+.legal-box{
+  position:relative;background:var(--bg2);
+  border:1px solid var(--border2);border-radius:var(--r4);
+  width:100%;max-width:560px;max-height:85vh;
+  display:flex;flex-direction:column;
+  box-shadow:var(--shadow-lg);
+  animation:legalIn 0.25s cubic-bezier(0.16,1,0.3,1);
+}
+@keyframes legalIn{from{opacity:0;transform:scale(0.95) translateY(10px)}to{opacity:1;transform:none}}
+.legal-box-hd{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 22px;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.legal-box-hd h3{font-size:16px;font-weight:800;letter-spacing:-0.02em}
+.legal-box-close{
+  width:28px;height:28px;border-radius:50%;background:var(--surface);
+  border:none;color:var(--text2);font-size:15px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all 0.15s;
+}
+.legal-box-close:hover{background:var(--surface2);color:var(--text)}
+.legal-box-body{overflow-y:auto;padding:22px;flex:1;line-height:1.7;font-size:13px;color:var(--text2)}
+.legal-box-body h4{font-size:14px;font-weight:700;color:var(--text);margin:18px 0 6px}
+.legal-box-body h4:first-child{margin-top:0}
+.legal-box-body p{margin-bottom:10px}
+.legal-box-body ul{padding-left:18px;margin-bottom:10px}
+.legal-box-body ul li{margin-bottom:4px}
+.legal-box-body::-webkit-scrollbar{width:4px}
+.legal-box-body::-webkit-scrollbar-thumb{background:var(--surface2);border-radius:4px}
+.legal-box-footer{padding:14px 22px;border-top:1px solid var(--border);flex-shrink:0}
+/* Legal links */
+.legal-link{
+  color:var(--text3);text-decoration:none;font-size:12px;
+  transition:color 0.15s;cursor:pointer;
+}
+.legal-link:hover{color:var(--accent-light)}
+/* Auth legal notice */
+.auth-legal{
+  text-align:center;font-size:12px;color:var(--text3);
+  margin-top:14px;line-height:1.6;
+}
+/* Footer */
+.site-footer{
+  position:fixed;bottom:0;left:0;right:0;
+  padding:10px 20px;text-align:center;
+  font-size:11px;color:var(--text3);
+  background:linear-gradient(to top,var(--bg) 60%,transparent);
+  pointer-events:none;z-index:10;
+}
+.site-footer a,.site-footer span{pointer-events:all}
+.site-footer-links{display:flex;gap:16px;justify-content:center;align-items:center;margin-bottom:4px;flex-wrap:wrap}
+.site-footer-links a{color:var(--text3);text-decoration:none;transition:color 0.15s;font-size:11px}
+.site-footer-links a:hover{color:var(--accent-light)}
+.site-footer-sep{color:var(--border2)}
+
 /* ══ MOBILE COMPACT ═══════════════════════════════ */
 @media(max-width:767px){
   body{font-size:13px}
@@ -909,6 +967,12 @@ body.desktop #toasts{bottom:20px}
       <button class="btn btn-outline btn-lg" id="sendOtpBtn">📧 Enviar código al email</button>
       <p class="auth-link">¿No tienes cuenta? <span id="goReg">Crear tienda gratis</span></p>
       <p class="auth-link" style="margin-top:8px"><span id="goForgot" style="color:var(--text3);font-size:12px">¿Olvidaste tu contraseña?</span></p>
+    <p class="auth-legal">
+      Al continuar aceptas los
+      <a class="legal-link" onclick="openLegal('terms')" style="font-size:12px">Términos de uso</a>
+      y la
+      <a class="legal-link" onclick="openLegal('privacy')" style="font-size:12px">Política de privacidad</a>
+    </p>
     </div>
 
     <!-- STEP 2: OTP verification -->
@@ -953,6 +1017,12 @@ body.desktop #toasts{bottom:20px}
       <div class="form-group"><label>Email *</label><input type="email" id="regEmail" placeholder="ana@email.com"></div>
       <div class="form-group"><label>Contraseña *</label><input type="password" id="regPass" placeholder="Mínimo 6 caracteres"></div>
       <button class="btn btn-primary btn-lg" id="regBtn">Continuar →</button>
+      <p class="auth-legal">
+        Al registrarte aceptas los
+        <a class="legal-link" onclick="openLegal('terms')" style="font-size:12px">Términos de uso</a>
+        y la
+        <a class="legal-link" onclick="openLegal('privacy')" style="font-size:12px">Política de privacidad</a>
+      </p>
       <p class="auth-link">¿Ya tienes cuenta? <span id="goLogin">Iniciar sesión</span></p>
     </div>
 
@@ -3744,8 +3814,199 @@ loadProds = async function(){
 };
 
 
+// ═══════════════════════════════════════════════════
+// LEGAL MODALS
+// ═══════════════════════════════════════════════════
+const LEGAL_CONTENT = {
+  terms: {
+    title: 'Términos de uso',
+    body: `
+      <h4>1. Aceptación de los términos</h4>
+      <p>Al acceder y usar OperixERP, aceptas estar sujeto a estos Términos de Uso. Si no estás de acuerdo, no uses el servicio.</p>
+
+      <h4>2. Descripción del servicio</h4>
+      <p>OperixERP es un sistema de gestión comercial (POS, inventario, clientes, contabilidad) ofrecido como servicio SaaS. Nos reservamos el derecho de modificar o discontinuar el servicio con previo aviso.</p>
+
+      <h4>3. Cuentas de usuario</h4>
+      <ul>
+        <li>Eres responsable de mantener la confidencialidad de tu cuenta y contraseña.</li>
+        <li>Debes notificarnos inmediatamente de cualquier uso no autorizado.</li>
+        <li>Una cuenta es para un negocio. No puedes transferirla sin autorización.</li>
+      </ul>
+
+      <h4>4. Uso aceptable</h4>
+      <p>Te comprometes a no usar el servicio para actividades ilegales, fraudulentas o que violen derechos de terceros. Nos reservamos el derecho de suspender cuentas que infrinjan estas condiciones.</p>
+
+      <h4>5. Datos y privacidad</h4>
+      <p>El uso de tus datos está regido por nuestra Política de Privacidad. Eres propietario de tus datos comerciales. OperixERP no los venderá ni compartirá sin tu consentimiento.</p>
+
+      <h4>6. Pagos y suscripción</h4>
+      <p>Los planes de pago se detallan en la sección de Pagos. Los cargos son recurrentes según el plan elegido. Puedes cancelar en cualquier momento desde tu cuenta.</p>
+
+      <h4>7. Limitación de responsabilidad</h4>
+      <p>OperixERP no será responsable por daños indirectos, incidentales o consecuentes derivados del uso o imposibilidad de uso del servicio.</p>
+
+      <h4>8. Modificaciones</h4>
+      <p>Podemos actualizar estos términos. Te notificaremos por email con al menos 15 días de anticipación ante cambios materiales.</p>
+
+      <h4>9. Ley aplicable</h4>
+      <p>Estos términos se rigen por las leyes de la República de Chile. Cualquier disputa se resolverá en los tribunales competentes de Santiago, Chile.</p>
+
+      <p style="margin-top:16px;font-size:11px;color:var(--text3)">Última actualización: marzo 2026</p>
+    `
+  },
+  privacy: {
+    title: 'Política de privacidad',
+    body: `
+      <h4>1. Información que recopilamos</h4>
+      <ul>
+        <li><strong style="color:var(--text)">Datos de cuenta:</strong> nombre, email, nombre del negocio.</li>
+        <li><strong style="color:var(--text)">Datos comerciales:</strong> productos, ventas, clientes, inventario que ingresas al sistema.</li>
+        <li><strong style="color:var(--text)">Datos técnicos:</strong> dirección IP, navegador, dispositivo (solo para seguridad y soporte).</li>
+      </ul>
+
+      <h4>2. Cómo usamos tu información</h4>
+      <ul>
+        <li>Proveer y mejorar el servicio OperixERP.</li>
+        <li>Enviarte comunicaciones relacionadas con tu cuenta.</li>
+        <li>Cumplir obligaciones legales.</li>
+      </ul>
+
+      <h4>3. Almacenamiento y seguridad</h4>
+      <p>Tus datos se almacenan en Supabase (infraestructura segura con cifrado en tránsito y reposo). No tenemos acceso a tus contraseñas — se almacenan con hash.</p>
+
+      <h4>4. Compartir información</h4>
+      <p>No vendemos ni arrendamos tus datos personales. Solo los compartimos con proveedores de infraestructura necesarios para el servicio (Supabase, Cloudflare, Resend) bajo acuerdos de confidencialidad.</p>
+
+      <h4>5. Tus derechos</h4>
+      <ul>
+        <li>Acceder y exportar tus datos en cualquier momento.</li>
+        <li>Solicitar eliminación de tu cuenta y datos.</li>
+        <li>Rectificar información incorrecta.</li>
+      </ul>
+
+      <h4>6. Cookies</h4>
+      <p>Usamos almacenamiento local (localStorage/sessionStorage) para mantener tu sesión. No usamos cookies de seguimiento ni publicidad.</p>
+
+      <h4>7. Retención de datos</h4>
+      <p>Conservamos tus datos mientras tu cuenta esté activa. Al eliminar tu cuenta, los datos se borran en un plazo máximo de 30 días.</p>
+
+      <h4>8. Contacto</h4>
+      <p>Para consultas sobre privacidad: <a href="mailto:privacidad@operixerp.cloud" style="color:var(--accent-light)">privacidad@operixerp.cloud</a></p>
+
+      <p style="margin-top:16px;font-size:11px;color:var(--text3)">Última actualización: marzo 2026</p>
+    `
+  },
+  payments: {
+    title: 'Información de pagos',
+    body: `
+      <h4>Planes disponibles</h4>
+      <p>OperixERP ofrece distintos planes según el tamaño y necesidades de tu negocio. Consulta con nuestro equipo para conocer las tarifas actuales.</p>
+
+      <h4>Métodos de pago aceptados</h4>
+      <ul>
+        <li>Transferencia bancaria (Chile)</li>
+        <li>Tarjeta de crédito / débito</li>
+        <li>Flow / Transbank</li>
+        <li>MercadoPago</li>
+      </ul>
+
+      <h4>Facturación</h4>
+      <p>Los planes se facturan mensual o anualmente según lo acordado. Recibirás un comprobante por email en cada cobro.</p>
+
+      <h4>Cancelación y reembolsos</h4>
+      <p>Puedes cancelar tu suscripción en cualquier momento. No realizamos reembolsos por períodos ya cobrados, pero tu acceso se mantiene hasta el fin del período pagado.</p>
+
+      <h4>Período de prueba</h4>
+      <p>Nuevas cuentas tienen acceso completo durante el período de prueba sin costo. No se requiere tarjeta para comenzar.</p>
+
+      <h4>Contacto de facturación</h4>
+      <p><a href="mailto:pagos@operixerp.cloud" style="color:var(--accent-light)">pagos@operixerp.cloud</a></p>
+
+      <p style="margin-top:16px;font-size:11px;color:var(--text3)">Los precios pueden cambiar con previo aviso de 30 días.</p>
+    `
+  },
+  support: {
+    title: 'Soporte',
+    body: `
+      <h4>¿Necesitas ayuda?</h4>
+      <p>Estamos aquí para ayudarte a sacar el máximo provecho de OperixERP.</p>
+
+      <h4>Canales de soporte</h4>
+      <ul>
+        <li>📧 <a href="mailto:soporte@operixerp.cloud" style="color:var(--accent-light)">soporte@operixerp.cloud</a></li>
+        <li>💬 Chat en vivo (disponible en horario comercial)</li>
+        <li>📲 WhatsApp: disponible para clientes con plan activo</li>
+      </ul>
+
+      <h4>Horario de atención</h4>
+      <p>Lunes a viernes, 9:00 – 18:00 hrs (Chile continental, GMT-3).</p>
+
+      <h4>Tiempos de respuesta</h4>
+      <ul>
+        <li>Incidencias críticas: hasta 4 horas hábiles</li>
+        <li>Consultas generales: hasta 24 horas hábiles</li>
+        <li>Solicitudes de funcionalidades: hasta 5 días hábiles</li>
+      </ul>
+
+      <h4>Documentación</h4>
+      <p>Próximamente disponible en <a href="https://docs.operixerp.cloud" style="color:var(--accent-light)" target="_blank">docs.operixerp.cloud</a></p>
+    `
+  }
+};
+
+function openLegal(type) {
+  const content = LEGAL_CONTENT[type];
+  if (!content) return;
+  document.getElementById('legalTitle').textContent = content.title;
+  document.getElementById('legalBody').innerHTML = content.body;
+  document.getElementById('legalModal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLegal() {
+  document.getElementById('legalModal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+// Close on Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeLegal();
+});
+
+
 // Globals for inline onclick
 window.closeModal=closeModal;window.sendEmailViaWorker=sendEmailViaWorker;window.setMainImg=setMainImg;window.removeGalleryImg=removeGalleryImg;window.addImgFromUrl=addImgFromUrl;window.addVarGroup=addVarGroup;window.addVarValue=addVarValue;window.catVarPickSel=catVarPickSel;window.showAddDev=showAddDev;window.saveDevolution=saveDevolution;window.shareRec=shareRec;window.catQty=catQty;window.saveCFMove=saveCFMove;window.doPayDebt=doPayDebt;window.savePayable=savePayable;window.saveClient=saveClient;window.saveProd=saveProd;window.saveEntry=saveEntry;window.saveUser=saveUser;window.saveDebt=saveDebt;window.savePurchase=savePurchase;window.sendOrder=sendOrder;window.copyTxt=copyTxt;window.shareWA=shareWA;window.runImport=runImport;
 </script>
+
+<!-- SITE FOOTER -->
+<footer class="site-footer">
+  <div class="site-footer-links">
+    <a onclick="openLegal('terms')">Términos</a>
+    <span class="site-footer-sep">·</span>
+    <a onclick="openLegal('privacy')">Privacidad</a>
+    <span class="site-footer-sep">·</span>
+    <a onclick="openLegal('payments')">Pagos</a>
+    <span class="site-footer-sep">·</span>
+    <a onclick="openLegal('support')">Soporte</a>
+  </div>
+  <div>© 2026 OperixERP — Todos los derechos reservados</div>
+</footer>
+
+<!-- LEGAL MODAL -->
+<div id="legalModal" class="legal-modal hidden">
+  <div class="legal-modal-bg" onclick="closeLegal()"></div>
+  <div class="legal-box">
+    <div class="legal-box-hd">
+      <h3 id="legalTitle">Términos de uso</h3>
+      <button class="legal-box-close" onclick="closeLegal()">✕</button>
+    </div>
+    <div class="legal-box-body" id="legalBody"></div>
+    <div class="legal-box-footer">
+      <button class="btn btn-primary" style="width:100%" onclick="closeLegal()">Entendido</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
