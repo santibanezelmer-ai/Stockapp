@@ -66,7 +66,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:15
 .main{max-width:1200px;margin:0 auto;padding:28px 24px}
 
 /* STATS */
-.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px}
 .stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:16px}
 .stat-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .stat-icon{font-size:22px}
@@ -166,6 +166,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     </div>
     <div class="topbar-right">
       <span class="admin-name" id="adminName"></span>
+      <button class="btn btn-outline" style="font-size:12px;padding:6px 12px" onclick="exportNegocios()">📊 Exportar</button>
       <button class="logout-btn" id="logoutBtn">🚪 Salir</button>
     </div>
   </div>
@@ -197,6 +198,11 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div class="stat-top"><span class="stat-icon">⏳</span></div>
         <div class="stat-label">Trial / Free</div>
         <div class="stat-value yellow" id="statTrial">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top"><span class="stat-icon">💵</span></div>
+        <div class="stat-label">Vencen en 7 días</div>
+        <div class="stat-value red" id="statExpiring">0</div>
       </div>
     </div>
 
@@ -345,10 +351,16 @@ function renderStats() {
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
   const newThisWeek = allNegocios.filter(n => n.created_at > weekAgo).length;
 
+  const expiring = allNegocios.filter(n => {
+    if (!n.suscripcion_fin || n.plan === 'blocked' || n.plan === 'free') return false;
+    const dl = daysLeft(n.suscripcion_fin);
+    return dl !== null && dl <= 7 && dl >= 0;
+  }).length;
   $('statNegocios').textContent = total;
   $('statActivos').textContent = activos;
   $('statPagados').textContent = pagados;
   $('statTrial').textContent = trial;
+  if($('statExpiring')) $('statExpiring').textContent = expiring;
   $('statTrendNegocios').textContent = '+' + newThisWeek + ' esta semana';
 }
 
@@ -455,6 +467,8 @@ function renderTable(filterQ = '', filterPlan = '') {
             : `<button class="btn btn-success btn-sm" data-action="unblock" data-id="${n.id}">✅ Activar</button>`
           }
           <button class="btn btn-ghost btn-sm" data-action="wa" data-id="${n.id}" data-nombre="${esc(n.nombre||'')}" data-email="${esc(n.email||'')}">📲 WA</button>
+          <button class="btn btn-warn btn-sm" data-action="changemail" data-id="${n.id}" data-email="${esc(n.email||'')}">✉ Email</button>
+          <button class="btn btn-danger btn-sm" data-action="delete" data-id="${n.id}" data-nombre="${esc(n.nombre||'')}">🗑 Eliminar</button>
         </div>
       </td>
     </tr>`;
@@ -553,6 +567,8 @@ async function showManage(id) {
 
   $('modalFooter').innerHTML = `
     <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+    <button class="btn btn-warn btn-sm" onclick="showResetPassword('${id}','${esc(neg.nombre||'')}')">🔑 Reset Pass</button>
+    <button class="btn btn-ghost btn-sm" onclick="showSendNotification('${id}','${esc(neg.email||'')}','${esc(neg.nombre||'')}')">📧 Notificar</button>
     <button class="btn btn-primary" onclick="saveManage('${id}')">💾 Guardar</button>`;
 
   $('modal').classList.remove('hidden');
@@ -621,10 +637,230 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (action === 'block') blockNegocio(id);
     else if (action === 'unblock') unblockNegocio(id);
     else if (action === 'wa') sendWA(btn.dataset.nombre, btn.dataset.email);
+    else if (action === 'changemail') showChangeEmail(id, btn.dataset.email);
+    else if (action === 'delete') deleteNegocio(id, btn.dataset.nombre);
   });
 });
 
 // globals for inline onclick
+// ── Delete negocio (full cascade) ──────────────────────────────────────────
+async function deleteNegocio(id, nombre) {
+  const confirm1 = confirm(`⚠ ¿Eliminar COMPLETAMENTE la tienda "${nombre}"?
+
+Esto eliminará:
+• Todos los productos
+• Todas las ventas
+• Todos los clientes
+• Todos los usuarios
+• La configuración
+
+Esta acción NO se puede deshacer.`);
+  if (!confirm1) return;
+  const confirm2 = prompt(`Para confirmar, escribe el nombre exacto de la tienda:
+"${nombre}"`);
+  if (confirm2 !== nombre) { toast('Nombre incorrecto — eliminación cancelada', 'error', 4000); return; }
+
+  showLoad();
+  try {
+    // Delete in order (foreign key constraints)
+    const tables = [
+      `detalle_ventas?venta_id=in.(select id from ventas where negocio_id=eq.${id})`,
+      `ventas?negocio_id=eq.${id}`,
+      `deudas?negocio_id=eq.${id}`,
+      `compras?negocio_id=eq.${id}`,
+      `cuentas_pagar?negocio_id=eq.${id}`,
+      `contabilidad?negocio_id=eq.${id}`,
+      `flujo_caja?negocio_id=eq.${id}`,
+      `devoluciones?negocio_id=eq.${id}`,
+      `historial_precios?negocio_id=eq.${id}`,
+      `productos?negocio_id=eq.${id}`,
+      `clientes?negocio_id=eq.${id}`,
+      `sucursales?negocio_id=eq.${id}`,
+      `configuracion?negocio_id=eq.${id}`,
+      `usuarios?negocio_id=eq.${id}`,
+      `negocios?id=eq.${id}`,
+    ];
+
+    let errors = 0;
+    for (const path of tables) {
+      try {
+        await sb('/rest/v1/' + path, { method: 'DELETE' });
+      } catch(e) {
+        errors++;
+        console.warn('Error deleting', path, e.message);
+      }
+    }
+
+    hideLoad();
+    if (errors === 0) {
+      toast(`✓ Tienda "${nombre}" eliminada completamente`, 'success', 4000);
+    } else {
+      toast(`Tienda eliminada con ${errors} advertencia(s) — revisa consola`, 'warn', 5000);
+    }
+    loadAll();
+  } catch(e) {
+    hideLoad();
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+// ── Change email ────────────────────────────────────────────────────────────
+function showChangeEmail(id, currentEmail) {
+  $('modalTitle').textContent = '✉ Cambiar Email';
+  $('modalBody').innerHTML = `
+    <div class="neg-panel">
+      <div class="neg-panel-title">Email actual</div>
+      <div style="font-family:var(--mono);font-size:14px;color:var(--text2);margin-bottom:16px">${esc(currentEmail)}</div>
+      <div class="form-group"><label>Nuevo email *</label><input type="email" id="newEmailInput" placeholder="nuevo@email.com" value="${esc(currentEmail)}"></div>
+      <div class="form-group"><label>Confirmar nuevo email *</label><input type="email" id="newEmailConfirm" placeholder="nuevo@email.com"></div>
+      <div style="background:var(--ybg);border:1px solid var(--yel-border);border-radius:var(--r);padding:10px 13px;font-size:12px;color:var(--yellow);margin-top:4px">
+        ⚠ Esto actualiza el email en negocios Y en el usuario administrador.
+      </div>
+    </div>`;
+  $('modalFooter').innerHTML = `
+    <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+    <button class="btn btn-primary" onclick="doChangeEmail('${id}', '${esc(currentEmail)}')">💾 Actualizar email</button>`;
+  $('modal').classList.remove('hidden');
+}
+
+async function doChangeEmail(negId, oldEmail) {
+  const newEmail   = $('newEmailInput').value.trim().toLowerCase();
+  const confirm    = $('newEmailConfirm').value.trim().toLowerCase();
+  if (!newEmail || !newEmail.includes('@')) { toast('Email inválido', 'error'); return; }
+  if (newEmail !== confirm) { toast('Los emails no coinciden', 'error'); return; }
+  if (newEmail === oldEmail.toLowerCase()) { toast('El email es el mismo', 'warn'); return; }
+
+  showLoad();
+  try {
+    // Check new email not already in use
+    const check = await sb(`/rest/v1/usuarios?login=eq.${encodeURIComponent(newEmail)}&select=id`);
+    if (check.ok && check.data.length) {
+      toast('Ese email ya está registrado en otra cuenta', 'error', 4000);
+      hideLoad(); return;
+    }
+
+    // Update negocio email
+    await sb(`/rest/v1/negocios?id=eq.${negId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ email: newEmail })
+    });
+
+    // Update usuario login (admin user)
+    await sb(`/rest/v1/usuarios?negocio_id=eq.${negId}&rol=eq.admin`, {
+      method: 'PATCH',
+      body: JSON.stringify({ login: newEmail })
+    });
+
+    hideLoad();
+    toast('✓ Email actualizado a ' + newEmail, 'success', 4000);
+    closeModal();
+    loadAll();
+  } catch(e) {
+    hideLoad();
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+// ── Reset password (admin force) ────────────────────────────────────────────
+function showResetPassword(negId, nombre) {
+  $('modalTitle').textContent = '🔑 Restablecer Contraseña';
+  $('modalBody').innerHTML = `
+    <div class="neg-panel">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px">${esc(nombre)}</div>
+      <div class="form-group"><label>Nueva contraseña *</label><input type="password" id="adminNewPass" placeholder="Mínimo 6 caracteres"></div>
+      <div class="form-group"><label>Confirmar *</label><input type="password" id="adminConfirmPass" placeholder="Repite la contraseña"></div>
+    </div>`;
+  $('modalFooter').innerHTML = `
+    <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+    <button class="btn btn-primary" onclick="doAdminResetPass('${negId}')">🔒 Guardar</button>`;
+  $('modal').classList.remove('hidden');
+}
+
+async function doAdminResetPass(negId) {
+  const pass    = $('adminNewPass').value.trim();
+  const confirm = $('adminConfirmPass').value.trim();
+  if (!pass || pass.length < 6) { toast('Mínimo 6 caracteres', 'error'); return; }
+  if (pass !== confirm) { toast('Las contraseñas no coinciden', 'error'); return; }
+  showLoad();
+  const r = await sb(`/rest/v1/usuarios?negocio_id=eq.${negId}&rol=eq.admin`, {
+    method: 'PATCH',
+    body: JSON.stringify({ password: pass, updated_at: new Date().toISOString() })
+  });
+  hideLoad();
+  if (r.ok) { toast('✓ Contraseña actualizada', 'success'); closeModal(); }
+  else toast('Error al actualizar', 'error');
+}
+
+// ── Send notification email to negocio ─────────────────────────────────────
+function showSendNotification(negId, email, nombre) {
+  $('modalTitle').textContent = '📧 Enviar Notificación';
+  $('modalBody').innerHTML = `
+    <div class="neg-panel">
+      <div class="neg-panel-title">Destinatario</div>
+      <div style="font-family:var(--mono);font-size:13px;color:var(--text2);margin-bottom:16px">${esc(email)}</div>
+      <div class="form-group"><label>Asunto *</label>
+        <input type="text" id="notifSubject" placeholder="Ej: Actualización de tu plan" list="notifSubjects">
+        <datalist id="notifSubjects">
+          <option value="Tu suscripción vence pronto — OperixERP">
+          <option value="Tu plan ha sido actualizado — OperixERP">
+          <option value="Bienvenido a OperixERP">
+          <option value="Mantenimiento programado — OperixERP">
+        </datalist>
+      </div>
+      <div class="form-group"><label>Mensaje *</label>
+        <textarea id="notifBody" rows="5" placeholder="Escribe el mensaje..."></textarea>
+      </div>
+    </div>`;
+  $('modalFooter').innerHTML = `
+    <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+    <button class="btn btn-primary" onclick="doSendNotification('${esc(email)}','${esc(nombre)}')">📧 Enviar</button>`;
+  $('modal').classList.remove('hidden');
+}
+
+async function doSendNotification(email, nombre) {
+  const subject = $('notifSubject').value.trim();
+  const body    = $('notifBody').value.trim();
+  if (!subject || !body) { toast('Completa asunto y mensaje', 'warn'); return; }
+
+  const emailHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:-apple-system,sans-serif;background:#0A0C10;margin:0;padding:40px 20px">
+    <div style="max-width:520px;margin:0 auto;background:#111318;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:36px">
+      <div style="text-align:center;margin-bottom:24px">
+        <span style="font-size:40px">⚡</span>
+        <h1 style="color:#EEF0F8;font-size:20px;font-weight:800;margin:12px 0 0">OperixERP</h1>
+      </div>
+      <h2 style="color:#EEF0F8;font-size:18px;font-weight:700;margin:0 0 16px">${subject}</h2>
+      <div style="color:#7A8099;font-size:14px;line-height:1.7;white-space:pre-wrap">${body}</div>
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.08);margin:24px 0">
+      <p style="color:#454B5E;font-size:12px;text-align:center;margin:0">© OperixERP — operixerp.cloud</p>
+    </div></body></html>`;
+
+  showLoad();
+  const res = await fetch('/api/send-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to: email, subject, html: emailHtml })
+  });
+  const data = await res.json();
+  hideLoad();
+  if (data.success) { toast('✓ Email enviado a ' + email, 'success', 4000); closeModal(); }
+  else toast('Error: ' + (data.message || 'desconocido'), 'error', 4000);
+}
+
+// ── Export all data (CSV) ────────────────────────────────────────────────────
+function exportNegocios() {
+  const header = 'nombre,email,plan,slug,registro,suscripcion_fin,notas';
+  const rows = allNegocios.map(n => [
+    n.nombre, n.email, n.plan||'free', n.slug,
+    fmtDate(n.created_at), fmtDate(n.suscripcion_fin), n.notas_admin||''
+  ].map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(','));
+  const csv = [header].concat(rows).join('\r\n')
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+  a.download = 'negocios_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('Exportado: ' + allNegocios.length + ' negocios', 'success');
+}
+
 window.closeModal = closeModal;
 window.saveManage = saveManage;
 window.setDuration = setDuration;
