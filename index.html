@@ -2643,7 +2643,7 @@ function initPWA(){
   const manifest={
     name:'OperixERP',short_name:'Operix',
     description:'Sistema de gestión para tu negocio',
-    start_url:'/',display:'standalone',
+    start_url:window.location.origin+'/',display:'standalone',
     background_color:'#0d0f14',theme_color:'#0d0f14',
     orientation:'any',
     icons:[
@@ -2796,18 +2796,20 @@ async function getOfflineCache(key){
   });
 }
 
-// Override sb() to handle offline
-const _sbOrig=sb;
-async function sb(path,opts={}){
+// Offline-aware wrapper for Supabase calls
+// Uses a separate name to avoid recursion
+async function sbOffline(path,opts={}){
   if(!navigator.onLine&&(!opts.method||opts.method==='GET')){
-    // Try cache for GET requests
     const cached=await getOfflineCache(path);
     if(cached)return{ok:true,status:200,data:cached};
     return{ok:false,status:0,data:[]};
   }
   try{
-    const result=await _sbOrig(path,opts);
-    // Cache successful GET responses
+    const headers={'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK,'Prefer':'return=representation',...(opts.headers||{})};
+    const res=await fetch(SB+path,{...opts,headers});
+    const txt=await res.text();
+    let data;try{data=JSON.parse(txt);}catch{data=txt;}
+    const result={ok:res.ok,status:res.status,data};
     if(result.ok&&(!opts.method||opts.method==='GET')&&Array.isArray(result.data)){
       cacheForOffline(path,result.data);
     }
@@ -2820,6 +2822,31 @@ async function sb(path,opts={}){
     throw e;
   }
 }
+
+// Make sb offline-aware by wrapping after definition
+const _realSb = sb;
+// Redefine sb to be offline-aware (no recursion since we captured _realSb)
+// eslint-disable-next-line no-func-assign
+sb = async function(path, opts={}) {
+  if(!navigator.onLine && (!opts.method || opts.method==='GET')){
+    const cached = await getOfflineCache(path);
+    if(cached) return {ok:true, status:200, data:cached};
+    return {ok:false, status:0, data:[]};
+  }
+  try{
+    const result = await _realSb(path, opts);
+    if(result.ok && (!opts.method||opts.method==='GET') && Array.isArray(result.data)){
+      cacheForOffline(path, result.data);
+    }
+    return result;
+  }catch(e){
+    if(!navigator.onLine){
+      const cached = await getOfflineCache(path);
+      return {ok:!!cached, status:cached?200:0, data:cached||[]};
+    }
+    throw e;
+  }
+};
 
 // ═══════════════════════════════════════════════════
 // OTP / MAGIC LINK AUTH
