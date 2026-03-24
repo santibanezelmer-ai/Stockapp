@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>OperixERP</title>
 
+<meta name="theme-color" content="#0d0f14">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="OperixERP">
+<link rel="manifest" id="pwaManifest">
 <style>
 /* ═══════════════════════════════════════════════════
    OPERIXERP — Design System v2
@@ -857,10 +863,39 @@ body.desktop #toasts{bottom:20px}
       <p>Sistema de gestión para tu negocio</p>
     </div>
     <div id="loginErr" class="auth-err hidden"></div>
-    <div class="form-group"><label>Email</label><input type="email" id="loginUser" placeholder="tu@email.com" autocomplete="username"></div>
-    <div class="form-group"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"></div>
-    <button class="btn btn-primary btn-lg" id="loginBtn">Iniciar Sesión</button>
-    <p class="auth-link">¿No tienes cuenta? <span id="goReg">Crear tienda gratis</span></p>
+
+    <!-- STEP 1: Email -->
+    <div id="loginStep1">
+      <div class="form-group"><label>Email</label><input type="email" id="loginUser" placeholder="tu@email.com" autocomplete="username"></div>
+      <div class="form-group"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"></div>
+      <button class="btn btn-primary btn-lg" id="loginBtn">Iniciar Sesión</button>
+      <div style="display:flex;align-items:center;gap:10px;margin:14px 0"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;color:var(--text3);font-weight:700">O INGRESA SIN CONTRASEÑA</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
+      <button class="btn btn-outline btn-lg" id="sendOtpBtn">📧 Enviar código al email</button>
+      <p class="auth-link">¿No tienes cuenta? <span id="goReg">Crear tienda gratis</span></p>
+    </div>
+
+    <!-- STEP 2: OTP verification -->
+    <div id="loginStep2" class="hidden">
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="font-size:36px;margin-bottom:10px">📧</div>
+        <div style="font-size:15px;font-weight:700;margin-bottom:6px">Revisa tu correo</div>
+        <div style="font-size:13px;color:var(--text2)" id="otpEmailHint">Enviamos un código a tu email</div>
+      </div>
+      <div class="form-group">
+        <label>Código de 6 dígitos</label>
+        <input type="text" id="otpInput" placeholder="000000" maxlength="6" autocomplete="one-time-code"
+          style="text-align:center;font-family:var(--mono);font-size:28px;font-weight:800;letter-spacing:0.15em">
+      </div>
+      <button class="btn btn-primary btn-lg" id="verifyOtpBtn">✓ Verificar código</button>
+      <div style="margin-top:12px;display:flex;gap:10px">
+        <button class="btn btn-outline" style="flex:1" id="backToLoginBtn">← Volver</button>
+        <button class="btn btn-ghost" style="flex:1" id="resendOtpBtn">↻ Reenviar</button>
+      </div>
+      <div style="margin-top:14px;text-align:center">
+        <div style="font-size:12px;color:var(--text2)">¿No llegó el código?</div>
+        <button class="btn btn-outline btn-lg" id="magicLinkBtn" style="margin-top:8px">🔗 Enviar link mágico</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -887,7 +922,10 @@ body.desktop #toasts{bottom:20px}
   <header class="topbar">
     <div class="topbar-brand">
       <div class="top-logo" id="topLogo">⚡</div>
-      <span class="top-biz" id="topBiz">Mi Negocio</span>
+      <div>
+        <span class="top-biz" id="topBiz">Mi Negocio</span>
+        <div id="topSucursal" class="hidden" style="font-size:10px;color:var(--accent-light);font-weight:700;letter-spacing:0.02em;cursor:pointer" onclick="showSucursalPicker()">📍 <span id="topSucursalName">Principal</span> ▾</div>
+      </div>
     </div>
     <div class="topbar-right">
       <span class="offline-pill hidden" id="offlineBadge">⚠ Sin conexión</span>
@@ -913,6 +951,7 @@ body.desktop #toasts{bottom:20px}
       <button class="sid-btn" data-sec="cashflow"><span class="si">💰</span>Caja</button>
       <button class="sid-btn" data-sec="reports"><span class="si">📊</span>Reportes</button>
       <div class="sid-label">Sistema</div>
+      <button class="sid-btn" data-sec="sucursales"><span class="si">🏢</span>Sucursales</button>
       <button class="sid-btn" data-sec="settings"><span class="si">⚙️</span>Configuración</button>
     </aside>
 
@@ -1116,6 +1155,29 @@ body.desktop #toasts{bottom:20px}
         <div class="card"><div class="card-title">Por método de pago</div><div id="repByPay"></div></div>
       </section>
 
+      <!-- SUCURSALES -->
+      <section class="section" id="sec-sucursales">
+        <div class="sec-hd">
+          <h2>Sucursales</h2>
+          <button class="btn btn-primary btn-sm" id="addSucursalBtn">+ Nueva</button>
+        </div>
+        <div class="card" style="background:var(--accent-glow2);border-color:var(--accent-glow)">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:24px">🏢</div>
+            <div>
+              <div style="font-size:13px;font-weight:700;color:var(--accent-light)">Sucursal activa</div>
+              <div id="activeSucursalName" style="font-size:16px;font-weight:800">Principal</div>
+            </div>
+            <button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="showSucursalPicker()">Cambiar</button>
+          </div>
+        </div>
+        <div class="stats-grid" style="grid-template-columns:1fr 1fr">
+          <div class="stat-card"><div class="stat-label">Sucursales</div><div class="stat-value accent" id="sucCount">0</div></div>
+          <div class="stat-card"><div class="stat-label">Activas</div><div class="stat-value green" id="sucActive">0</div></div>
+        </div>
+        <div id="sucursalesList" class="data-list"></div>
+      </section>
+
       <!-- SETTINGS -->
       <section class="section" id="sec-settings">
         <div class="sec-hd"><h2>Configuración</h2></div>
@@ -1246,6 +1308,7 @@ body.desktop #toasts{bottom:20px}
         <button class="more-item" data-sec="orders"><span class="mi">📲</span>Pedidos</button>
         <button class="more-item" data-sec="devolutions"><span class="mi">↩️</span>Devoluciones</button>
         <button class="more-item" data-sec="settings"><span class="mi">⚙️</span>Config.</button>
+        <button class="more-item" data-sec="sucursales"><span class="mi">🏢</span>Sucursales</button>
       </div>
     </div>
   </div>
@@ -1407,7 +1470,7 @@ function showSec(name){
   $$('.nav-btn[data-sec],.sid-btn[data-sec]').forEach(b=>b.classList.toggle('active',b.dataset.sec===name));
   $('appContent').scrollTop=0;
   $('moreOverlay').classList.add('hidden');
-  const loaders={dashboard:loadDash,sales:loadSalesSec,inventory:loadInv,clients:renderClients,purchases:loadPurchases,debts:loadDebts,payables:loadPayables,orders:loadOrders,devolutions:loadDevolutions,accounting:loadAcc,cashflow:loadCF,reports:()=>loadRep(S.repPeriod),settings:loadCfgUI};
+  const loaders={dashboard:loadDash,sales:loadSalesSec,inventory:loadInv,clients:renderClients,purchases:loadPurchases,debts:loadDebts,payables:loadPayables,orders:loadOrders,devolutions:loadDevolutions,accounting:loadAcc,cashflow:loadCF,reports:()=>loadRep(S.repPeriod),settings:loadCfgUI,sucursales:loadSucursales};
   if(loaders[name])loaders[name]();
 }
 
@@ -2163,7 +2226,7 @@ function copyTxt(txt){const ta=document.createElement('textarea');ta.value=txt;t
 function shareWA(url){window.open(`https://wa.me/?text=${encodeURIComponent(`Hola! Visita el catálogo de *${S.cfg.businessName||'Mi Negocio'}*:\n${url}`)}`, '_blank');}
 
 // EVENTS
-document.addEventListener('DOMContentLoaded',()=>{
+document.addEventListener('DOMContentLoaded',async ()=>{
   initCatalog();
   if(window.location.search.includes('pedido=1'))return;
 
@@ -2174,6 +2237,14 @@ document.addEventListener('DOMContentLoaded',()=>{
   $('regBtn').addEventListener('click',doRegister);
   $('regPass').addEventListener('keypress',e=>e.key==='Enter'&&doRegister());
   $('goLogin').addEventListener('click',showLogin);
+  // OTP
+  $('sendOtpBtn').addEventListener('click',sendOTP);
+  $('verifyOtpBtn').addEventListener('click',verifyOTP);
+  $('otpInput').addEventListener('keypress',e=>e.key==='Enter'&&verifyOTP());
+  $('otpInput').addEventListener('input',function(){this.value=this.value.replace(/[^0-9]/g,'').slice(0,6);});
+  $('backToLoginBtn').addEventListener('click',()=>{$('loginStep2').classList.add('hidden');$('loginStep1').classList.remove('hidden');$('loginErr').classList.add('hidden');});
+  $('resendOtpBtn').addEventListener('click',sendOTP);
+  $('magicLinkBtn').addEventListener('click',sendMagicLink);
 
   // LOGOUT - direct binding, simple and clean
   $('logoutBtn').addEventListener('click',doLogout);
@@ -2237,6 +2308,11 @@ document.addEventListener('DOMContentLoaded',()=>{
       if(a==='paypay'){payPayable(da.dataset.pid);return;}
       if(a==='delacc'){if(confirm('¿Eliminar?'))sb(`/rest/v1/contabilidad?id=eq.${da.dataset.eid}`,{method:'DELETE'}).then(()=>{toast('Eliminado','success');loadAcc();});return;}
       if(a==='deluser'){delUser(da.dataset.ul);return;}
+      if(a==='delsuc'){
+        if(confirm('¿Eliminar sucursal "'+da.dataset.sn+'"?'))
+          sb(`/rest/v1/sucursales?id=eq.${da.dataset.sid}`,{method:'PATCH',body:JSON.stringify({activa:false})}).then(()=>{toast('Eliminada','success');loadSucursales();});
+        return;
+      }
     }
   });
 
@@ -2293,6 +2369,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   $('addUserBtn').addEventListener('click',showAddUser);
   $('catLinkBtn').addEventListener('click',showCatLink);
   $('backupBtn').addEventListener('click',()=>toast('Datos en Supabase — siempre seguros','success'));
+  // Sucursales
+  $('addSucursalBtn').addEventListener('click',showAddSucursal);
   $('setColor').addEventListener('input',e=>{$('colorLabel').textContent=e.target.value;document.documentElement.style.setProperty('--accent',e.target.value);});
   $$('#colorPresets button').forEach(b=>b.addEventListener('click',()=>{$('setColor').value=b.dataset.color;$('colorLabel').textContent=b.dataset.color;document.documentElement.style.setProperty('--accent',b.dataset.color);}));
   $('desktopToggle').addEventListener('change',function(){setDesktop(this.checked);});
@@ -2306,8 +2384,30 @@ document.addEventListener('DOMContentLoaded',()=>{
   $('urlLogoBtn').addEventListener('click',()=>{const inp=$('logoUrlInp');inp.classList.toggle('hidden');if(!inp.classList.contains('hidden')){inp.focus();inp.addEventListener('change',()=>{const url=inp.value.trim();if(url){$('logoImg').src=url;$('logoImg').classList.remove('hidden');$('logoPlaceholder').classList.add('hidden');$('topLogo').innerHTML=`<img src="${esc(url)}" style="width:100%;height:100%;object-fit:contain">`;saveCfg({logo_url:url});}},{once:true});}});
   $('rmLogoBtn').addEventListener('click',()=>{$('logoImg').classList.add('hidden');$('logoImg').src='';$('logoPlaceholder').classList.remove('hidden');$('topLogo').innerHTML='⚡';$('logoUrlInp').value='';saveCfg({logo_url:''});});
 
+  // PWA + Offline init
+  initPWA();
+  initOfflineDB();
+
+  // Online/offline sync
+  window.addEventListener('online',()=>{
+    $('offlineBadge').classList.add('hidden');
+    syncOfflineQueue();
+  });
+  window.addEventListener('offline',()=>{
+    $('offlineBadge').classList.remove('hidden');
+  });
+
   // Session restore — AFTER all bindings so sidebar/nav work
   if(localStorage.getItem('ox_desktop')==='1')setDesktop(true);
+
+  // Restore sucursal
+  const savedSuc=localStorage.getItem('ox_sucursal');
+  if(savedSuc){try{const s=JSON.parse(savedSuc);S.sucursalId=s.id;S.sucursalName=s.name;}catch{}}
+
+  // Check magic link first
+  const magicLogin=await checkMagicLink();
+  if(magicLogin){startApp();return;}
+
   const saved=sessionStorage.getItem('ox_user');
   if(saved){try{S.user=JSON.parse(saved);startApp();}catch{sessionStorage.removeItem('ox_user');}}
 });
@@ -2534,6 +2634,381 @@ const _mObs=new MutationObserver(()=>{
   }
 });
 _mObs.observe(document.body,{childList:true,subtree:true});
+
+// ═══════════════════════════════════════════════════
+// PWA — Manifest + Service Worker
+// ═══════════════════════════════════════════════════
+function initPWA(){
+  // Inject manifest dynamically
+  const manifest={
+    name:'OperixERP',short_name:'Operix',
+    description:'Sistema de gestión para tu negocio',
+    start_url:'/',display:'standalone',
+    background_color:'#0d0f14',theme_color:'#0d0f14',
+    orientation:'any',
+    icons:[
+      {src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="%235B6EF5"/><text y=".9em" font-size="70" x="15">⚡</text></svg>',sizes:'any',type:'image/svg+xml',purpose:'any maskable'}
+    ]
+  };
+  const blob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const link=document.getElementById('pwaManifest');
+  if(link)link.href=url;
+
+  // Register service worker
+  if('serviceWorker' in navigator){
+    const swCode=`
+const CACHE='operix-v1';
+const SHELL=['/'];
+self.addEventListener('install',e=>{
+  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)));
+  self.skipWaiting();
+});
+self.addEventListener('activate',e=>{
+  e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+  self.clients.claim();
+});
+self.addEventListener('fetch',e=>{
+  const url=new URL(e.request.url);
+  // Network first for Supabase API
+  if(url.hostname.includes('supabase.co')){
+    e.respondWith(
+      fetch(e.request).catch(()=>new Response(JSON.stringify([]),{headers:{'Content-Type':'application/json'}}))
+    );
+    return;
+  }
+  // Cache first for app shell
+  e.respondWith(
+    caches.match(e.request).then(cached=>cached||fetch(e.request).then(res=>{
+      if(res.ok&&e.request.method==='GET'){
+        const clone=res.clone();
+        caches.open(CACHE).then(c=>c.put(e.request,clone));
+      }
+      return res;
+    }))
+  );
+});
+self.addEventListener('message',e=>{
+  if(e.data==='skipWaiting')self.skipWaiting();
+});`;
+    const swBlob=new Blob([swCode],{type:'application/javascript'});
+    const swUrl=URL.createObjectURL(swBlob);
+    navigator.serviceWorker.register(swUrl,{scope:'/'}).then(reg=>{
+      console.log('SW registered');
+      reg.addEventListener('updatefound',()=>{
+        const nw=reg.installing;
+        nw.addEventListener('statechange',()=>{
+          if(nw.state==='installed'&&navigator.serviceWorker.controller){
+            toast('Actualización disponible — recarga la página','warn',6000);
+          }
+        });
+      });
+    }).catch(e=>console.log('SW error:',e));
+  }
+
+  // Install prompt
+  let deferredPrompt=null;
+  window.addEventListener('beforeinstallprompt',e=>{
+    e.preventDefault();deferredPrompt=e;
+    showInstallBanner();
+  });
+  window._installPWA=async()=>{
+    if(!deferredPrompt)return;
+    deferredPrompt.prompt();
+    const{outcome}=await deferredPrompt.userChoice;
+    if(outcome==='accepted')hideInstallBanner();
+    deferredPrompt=null;
+  };
+}
+
+function showInstallBanner(){
+  if(document.getElementById('installBanner'))return;
+  const b=document.createElement('div');
+  b.id='installBanner';
+  b.style.cssText='position:fixed;bottom:calc(var(--nav) + 10px);left:12px;right:12px;background:linear-gradient(135deg,var(--accent),var(--violet-500));border-radius:var(--r2);padding:12px 14px;display:flex;align-items:center;gap:10px;z-index:500;box-shadow:var(--shadow-glow);animation:fadeUp 0.3s ease';
+  b.innerHTML=`<span style="font-size:22px">📱</span><div style="flex:1"><div style="font-size:13px;font-weight:700;color:white">Instalar OperixERP</div><div style="font-size:11px;color:rgba(255,255,255,0.75)">Acceso rápido desde tu pantalla de inicio</div></div><button onclick="window._installPWA()" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:7px 12px;border-radius:var(--r);font-size:12px;font-weight:700;cursor:pointer">Instalar</button><button onclick="hideInstallBanner()" style="background:none;border:none;color:rgba(255,255,255,0.7);font-size:18px;cursor:pointer;padding:4px">✕</button>`;
+  document.body.appendChild(b);
+}
+function hideInstallBanner(){const b=document.getElementById('installBanner');if(b)b.remove();}
+
+// ═══════════════════════════════════════════════════
+// OFFLINE MODE — IndexedDB queue
+// ═══════════════════════════════════════════════════
+const ODB_NAME='operix_offline',ODB_VER=1;
+let offlineDB=null;
+
+async function initOfflineDB(){
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open(ODB_NAME,ODB_VER);
+    req.onupgradeneeded=e=>{
+      const db=e.target.result;
+      if(!db.objectStoreNames.contains('queue'))
+        db.createObjectStore('queue',{keyPath:'id',autoIncrement:true});
+      if(!db.objectStoreNames.contains('cache'))
+        db.createObjectStore('cache',{keyPath:'key'});
+    };
+    req.onsuccess=e=>{offlineDB=e.target.result;res(offlineDB);};
+    req.onerror=e=>rej(e);
+  });
+}
+
+async function queueOffline(action,data){
+  if(!offlineDB)return;
+  const tx=offlineDB.transaction('queue','readwrite');
+  tx.objectStore('queue').add({action,data,ts:Date.now()});
+  toast('Sin conexión — se sincronizará al reconectar','warn',3000);
+}
+
+async function syncOfflineQueue(){
+  if(!offlineDB||!navigator.onLine)return;
+  const tx=offlineDB.transaction('queue','readwrite');
+  const store=tx.objectStore('queue');
+  const items=await new Promise(res=>{const r=store.getAll();r.onsuccess=()=>res(r.result);});
+  let synced=0;
+  for(const item of items){
+    try{
+      if(item.action==='sale'){
+        // Re-submit sale
+        await sb('/rest/v1/ventas',{method:'POST',body:JSON.stringify(item.data)});
+      } else if(item.action==='patch_stock'){
+        await sb(`/rest/v1/productos?id=eq.${item.data.id}`,{method:'PATCH',body:JSON.stringify({stock:item.data.stock})});
+      }
+      store.delete(item.id);
+      synced++;
+    }catch(e){console.warn('Sync failed for item',item.id,e);}
+  }
+  if(synced>0){toast(`✓ ${synced} operación(es) sincronizadas`,'success',3000);loadDash();}
+}
+
+async function cacheForOffline(key,data){
+  if(!offlineDB)return;
+  const tx=offlineDB.transaction('cache','readwrite');
+  tx.objectStore('cache').put({key,data,ts:Date.now()});
+}
+
+async function getOfflineCache(key){
+  if(!offlineDB)return null;
+  return new Promise(res=>{
+    const tx=offlineDB.transaction('cache','readonly');
+    const r=tx.objectStore('cache').get(key);
+    r.onsuccess=()=>res(r.result?r.result.data:null);
+    r.onerror=()=>res(null);
+  });
+}
+
+// Override sb() to handle offline
+const _sbOrig=sb;
+async function sb(path,opts={}){
+  if(!navigator.onLine&&(!opts.method||opts.method==='GET')){
+    // Try cache for GET requests
+    const cached=await getOfflineCache(path);
+    if(cached)return{ok:true,status:200,data:cached};
+    return{ok:false,status:0,data:[]};
+  }
+  try{
+    const result=await _sbOrig(path,opts);
+    // Cache successful GET responses
+    if(result.ok&&(!opts.method||opts.method==='GET')&&Array.isArray(result.data)){
+      cacheForOffline(path,result.data);
+    }
+    return result;
+  }catch(e){
+    if(!navigator.onLine){
+      const cached=await getOfflineCache(path);
+      return{ok:!!cached,status:cached?200:0,data:cached||[]};
+    }
+    throw e;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// OTP / MAGIC LINK AUTH
+// ═══════════════════════════════════════════════════
+let otpEmail='', otpCode='', otpExpiry=0;
+
+async function sendOTP(){
+  const email=$('loginUser').value.trim();
+  if(!email||!email.includes('@')){showAErr('loginErr','Ingresa tu email primero');return;}
+
+  // Verify email exists in usuarios
+  const r=await sb(`/rest/v1/usuarios?login=eq.${encodeURIComponent(email)}&activo=eq.true&select=id`);
+  if(!r.ok||!r.data.length){showAErr('loginErr','No encontramos una cuenta con ese email');return;}
+
+  // Generate 6-digit OTP
+  otpCode=String(Math.floor(100000+Math.random()*900000));
+  otpExpiry=Date.now()+10*60*1000; // 10 min
+  otpEmail=email;
+
+  // Store OTP in Supabase (otps table) or use email service
+  // For now: store in a simple way and show it (in production use email service)
+  const saveR=await sb('/rest/v1/otp_codes',{method:'POST',
+    body:JSON.stringify({email,code:otpCode,expires_at:new Date(otpExpiry).toISOString()})
+  });
+
+  // Show OTP step
+  $('loginStep1').classList.add('hidden');
+  $('loginStep2').classList.remove('hidden');
+  $('otpEmailHint').textContent='Enviamos el código a '+email;
+  $('loginErr').classList.add('hidden');
+
+  // In dev: show code in console
+  console.log('OTP para '+email+': '+otpCode);
+  toast('Código enviado a '+email,'success',4000);
+}
+
+async function verifyOTP(){
+  const input=($('otpInput').value||'').trim();
+  if(input.length!==6){showAErr('loginErr','Ingresa el código de 6 dígitos');return;}
+  if(Date.now()>otpExpiry){showAErr('loginErr','El código expiró. Solicita uno nuevo.');return;}
+
+  showLoad();
+  try{
+    // Verify against stored OTP
+    const r=await sb(`/rest/v1/otp_codes?email=eq.${encodeURIComponent(otpEmail)}&code=eq.${input}&select=*`);
+    if(!r.ok||!r.data.length){showAErr('loginErr','Código incorrecto');hideLoad();return;}
+
+    const otp=r.data[0];
+    if(new Date(otp.expires_at)<new Date()){showAErr('loginErr','El código expiró');hideLoad();return;}
+
+    // Delete used OTP
+    await sb(`/rest/v1/otp_codes?id=eq.${otp.id}`,{method:'DELETE'});
+
+    // Login user
+    const ur=await sb(`/rest/v1/usuarios?login=eq.${encodeURIComponent(otpEmail)}&activo=eq.true`);
+    if(!ur.ok||!ur.data.length){showAErr('loginErr','Error al iniciar sesión');hideLoad();return;}
+    const u=ur.data[0];
+    const nr=await sb(`/rest/v1/negocios?id=eq.${u.negocio_id}&select=nombre,plan`);
+    const neg=nr.data&&nr.data[0];
+    if(neg&&neg.plan==='blocked'){showAErr('loginErr','Cuenta suspendida');hideLoad();return;}
+    S.user={id:u.id,name:u.nombre,login:u.login,role:u.rol,nid:u.negocio_id,perms:u.permisos||{},bizName:neg?neg.nombre:''};
+    sessionStorage.setItem('ox_user',JSON.stringify(S.user));
+    hideLoad();
+    startApp();
+  }catch(e){showAErr('loginErr','Error: '+e.message);hideLoad();}
+}
+
+async function sendMagicLink(){
+  if(!otpEmail){showAErr('loginErr','Ingresa tu email primero');return;}
+  // Magic link = special token stored in DB, user clicks link to login
+  const token=Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);
+  const expires=new Date(Date.now()+30*60*1000).toISOString();
+  await sb('/rest/v1/otp_codes',{method:'POST',
+    body:JSON.stringify({email:otpEmail,code:'MAGIC_'+token,expires_at:expires,type:'magic'})
+  });
+  const link=window.location.origin+'?magic='+token+'&email='+encodeURIComponent(otpEmail);
+  console.log('Magic link:',link);
+  toast('Link mágico generado (ver consola en dev)','success',4000);
+  // In production: send via email service (SendGrid, Resend, etc.)
+}
+
+async function checkMagicLink(){
+  const params=new URLSearchParams(window.location.search);
+  const magic=params.get('magic');
+  const email=params.get('email');
+  if(!magic||!email)return false;
+
+  const r=await sb(`/rest/v1/otp_codes?email=eq.${encodeURIComponent(email)}&code=eq.MAGIC_${magic}&select=*`);
+  if(!r.ok||!r.data.length)return false;
+  const otp=r.data[0];
+  if(new Date(otp.expires_at)<new Date())return false;
+
+  await sb(`/rest/v1/otp_codes?id=eq.${otp.id}`,{method:'DELETE'});
+  const ur=await sb(`/rest/v1/usuarios?login=eq.${encodeURIComponent(email)}&activo=eq.true`);
+  if(!ur.ok||!ur.data.length)return false;
+  const u=ur.data[0];
+  const nr=await sb(`/rest/v1/negocios?id=eq.${u.negocio_id}&select=nombre,plan`);
+  const neg=nr.data&&nr.data[0];
+  S.user={id:u.id,name:u.nombre,login:u.login,role:u.rol,nid:u.negocio_id,perms:u.permisos||{},bizName:neg?neg.nombre:''};
+  sessionStorage.setItem('ox_user',JSON.stringify(S.user));
+  // Clean URL
+  window.history.replaceState({},'',window.location.pathname);
+  return true;
+}
+
+// ═══════════════════════════════════════════════════
+// SUCURSALES
+// ═══════════════════════════════════════════════════
+S.sucursalId = null;
+S.sucursalName = 'Principal';
+
+async function loadSucursales(){
+  if(!S.user)return;
+  const r=await sb(`/rest/v1/sucursales?negocio_id=eq.${S.user.nid}&order=nombre.asc`);
+  const suc=r.data||[];
+  $('sucCount').textContent=suc.length;
+  $('sucActive').textContent=suc.filter(s=>s.activa!==false).length;
+
+  const el=$('sucursalesList');
+  if(!suc.length){
+    el.innerHTML=`<div class="empty-state"><div class="icon">🏢</div><p>Sin sucursales adicionales.<br><small>Tu negocio tiene una sucursal principal por defecto.</small></p></div>`;
+    return;
+  }
+  el.innerHTML=suc.map(s=>`
+    <div class="data-item">
+      <div class="d-icon" style="background:${S.sucursalId===s.id?'var(--accent-glow)':'var(--surface2)'}">🏢</div>
+      <div class="d-info">
+        <div class="d-title">${esc(s.nombre)} ${S.sucursalId===s.id?'<span class="badge badge-accent">Activa</span>':''}</div>
+        <div class="d-sub">${esc(s.direccion||'—')} · ${esc(s.telefono||'—')}</div>
+      </div>
+      <div class="d-right" style="display:flex;gap:6px">
+        <button class="btn btn-outline btn-sm" onclick="switchSucursal('${s.id}','${esc(s.nombre)}')">Activar</button>
+        <button class="btn btn-danger btn-sm" data-sid="${s.id}" data-sn="${esc(s.nombre)}" data-a="delsuc">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function switchSucursal(id,name){
+  S.sucursalId=id;S.sucursalName=name;
+  localStorage.setItem('ox_sucursal',JSON.stringify({id,name}));
+  $('topSucursal').classList.remove('hidden');
+  $('topSucursalName').textContent=name;
+  $('activeSucursalName').textContent=name;
+  toast('Sucursal: '+name,'success');
+  closeModal();
+  // Reload current section data for new sucursal
+  if(S.sec)showSec(S.sec);
+}
+
+function showSucursalPicker(){
+  sb(`/rest/v1/sucursales?negocio_id=eq.${S.user.nid}&activa=eq.true`).then(r=>{
+    const suc=r.data||[];
+    const opts=[{id:null,nombre:'Principal — '+($('topBiz').textContent||'Mi Negocio')},...suc];
+    openModal('📍 Seleccionar Sucursal',
+      opts.map(s=>`<div class="data-item" style="cursor:pointer" onclick="switchSucursal('${s.id||''}','${esc(s.nombre)}')">
+        <div class="d-icon" style="background:${(S.sucursalId===s.id||(!S.sucursalId&&!s.id))?'var(--accent-glow)':'var(--surface2)'}">🏢</div>
+        <div class="d-info"><div class="d-title">${esc(s.nombre)}</div><div class="d-sub">${esc(s.direccion||'')}</div></div>
+        ${(S.sucursalId===s.id||(!S.sucursalId&&!s.id))?'<span class="badge badge-accent">✓</span>':''}
+      </div>`).join('')
+    );
+  });
+}
+
+function showAddSucursal(){
+  openModal('Nueva Sucursal',`
+    <div class="form-group"><label>Nombre *</label><input type="text" id="sucNombre" placeholder="Ej: Sucursal Centro"></div>
+    <div class="form-group"><label>Dirección</label><input type="text" id="sucDir" placeholder="Av. Principal 123"></div>
+    <div class="form-group"><label>Teléfono</label><input type="tel" id="sucTel" placeholder="+56 9..."></div>
+    <div class="form-group"><label>Encargado</label><input type="text" id="sucEncargado" placeholder="Nombre del encargado"></div>`,
+  `<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+   <button class="btn btn-primary" onclick="saveSucursal()">💾 Crear</button>`);
+}
+
+async function saveSucursal(){
+  const nombre=$('sucNombre').value.trim();
+  if(!nombre){toast('Nombre requerido','warn');return;}
+  showLoad();
+  const r=await sb('/rest/v1/sucursales',{method:'POST',body:JSON.stringify({
+    negocio_id:S.user.nid,nombre,
+    direccion:$('sucDir').value.trim(),
+    telefono:$('sucTel').value.trim(),
+    encargado:$('sucEncargado').value.trim(),
+    activa:true
+  })});
+  hideLoad();
+  if(r.ok){toast('Sucursal creada','success');closeModal();loadSucursales();}
+  else toast('Error al crear','error');
+}
+
 
 // Globals for inline onclick
 window.closeModal=closeModal;window.addVarGroup=addVarGroup;window.addVarValue=addVarValue;window.varPickSel=varPickSel;window.showAddDev=showAddDev;window.saveDevolution=saveDevolution;window.shareRec=shareRec;window.catQty=catQty;window.saveCFMove=saveCFMove;window.doPayDebt=doPayDebt;window.savePayable=savePayable;window.saveClient=saveClient;window.saveProd=saveProd;window.saveEntry=saveEntry;window.saveUser=saveUser;window.saveDebt=saveDebt;window.savePurchase=savePurchase;window.sendOrder=sendOrder;window.copyTxt=copyTxt;window.shareWA=shareWA;window.runImport=runImport;
