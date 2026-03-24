@@ -872,6 +872,7 @@ body.desktop #toasts{bottom:20px}
       <div style="display:flex;align-items:center;gap:10px;margin:14px 0"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;color:var(--text3);font-weight:700">O INGRESA SIN CONTRASEÑA</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
       <button class="btn btn-outline btn-lg" id="sendOtpBtn">📧 Enviar código al email</button>
       <p class="auth-link">¿No tienes cuenta? <span id="goReg">Crear tienda gratis</span></p>
+      <p class="auth-link" style="margin-top:8px"><span id="goForgot" style="color:var(--text3);font-size:12px">¿Olvidaste tu contraseña?</span></p>
     </div>
 
     <!-- STEP 2: OTP verification -->
@@ -940,6 +941,68 @@ body.desktop #toasts{bottom:20px}
         <button class="btn btn-outline" style="flex:1" id="regBackBtn">← Volver</button>
         <button class="btn btn-ghost" style="flex:1" id="regResendBtn">↻ Reenviar código</button>
       </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- FORGOT PASSWORD -->
+<div id="forgotScreen" class="screen hidden">
+  <div class="auth-box">
+
+    <!-- Step 1: Enter email -->
+    <div id="forgotStep1">
+      <div class="auth-logo">
+        <div class="auth-icon">🔑</div>
+        <h1>Restablecer contraseña</h1>
+        <p>Te enviaremos un código de verificación</p>
+      </div>
+      <div id="forgotErr" class="auth-err hidden"></div>
+      <div class="form-group">
+        <label>Email de tu cuenta</label>
+        <input type="email" id="forgotEmail" placeholder="tu@email.com" autocomplete="email">
+      </div>
+      <button class="btn btn-primary btn-lg" id="forgotSendBtn">📧 Enviar código</button>
+      <p class="auth-link"><span id="forgotBackLogin">← Volver al login</span></p>
+    </div>
+
+    <!-- Step 2: Verify OTP -->
+    <div id="forgotStep2" class="hidden">
+      <div class="auth-logo">
+        <div class="auth-icon">📧</div>
+        <h1>Revisa tu correo</h1>
+        <p id="forgotEmailHint">Enviamos el código a tu email</p>
+      </div>
+      <div id="forgotErr2" class="auth-err hidden"></div>
+      <div class="form-group">
+        <label>Código de verificación</label>
+        <input type="text" id="forgotOtpInput" placeholder="000000" maxlength="6" autocomplete="one-time-code"
+          style="text-align:center;font-family:var(--mono);font-size:28px;font-weight:800;letter-spacing:0.15em">
+      </div>
+      <button class="btn btn-primary btn-lg" id="forgotVerifyBtn">✓ Verificar código</button>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-outline" style="flex:1" id="forgotBackStep1">← Volver</button>
+        <button class="btn btn-ghost" style="flex:1" id="forgotResendBtn">↻ Reenviar</button>
+      </div>
+    </div>
+
+    <!-- Step 3: New password -->
+    <div id="forgotStep3" class="hidden">
+      <div class="auth-logo">
+        <div class="auth-icon">🔒</div>
+        <h1>Nueva contraseña</h1>
+        <p>Elige una contraseña segura</p>
+      </div>
+      <div id="forgotErr3" class="auth-err hidden"></div>
+      <div class="form-group">
+        <label>Nueva contraseña *</label>
+        <input type="password" id="forgotNewPass" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label>Confirmar contraseña *</label>
+        <input type="password" id="forgotConfirmPass" placeholder="Repite la contraseña" autocomplete="new-password">
+      </div>
+      <button class="btn btn-primary btn-lg" id="forgotSaveBtn">🔒 Guardar nueva contraseña</button>
     </div>
 
   </div>
@@ -2367,6 +2430,19 @@ document.addEventListener('DOMContentLoaded',async ()=>{
     $('regErr').classList.add('hidden');
   });
   $('regResendBtn').addEventListener('click',resendRegOTP);
+  // Forgot password
+  $('goForgot').addEventListener('click', showForgot);
+  $('forgotBackLogin').addEventListener('click', hideForgot);
+  $('forgotSendBtn').addEventListener('click', forgotSendCode);
+  $('forgotEmail').addEventListener('keypress', e=>e.key==='Enter'&&forgotSendCode());
+  $('forgotVerifyBtn').addEventListener('click', forgotVerifyCode);
+  $('forgotOtpInput').addEventListener('keypress', e=>e.key==='Enter'&&forgotVerifyCode());
+  $('forgotOtpInput').addEventListener('input', function(){this.value=this.value.replace(/[^0-9]/g,'').slice(0,6);});
+  $('forgotBackStep1').addEventListener('click', ()=>{$('forgotStep2').classList.add('hidden');$('forgotStep1').classList.remove('hidden');$('forgotErr2').classList.add('hidden');});
+  $('forgotResendBtn').addEventListener('click', forgotResend);
+  $('forgotSaveBtn').addEventListener('click', forgotSavePassword);
+  $('forgotNewPass').addEventListener('keypress', e=>e.key==='Enter'&&forgotSavePassword());
+  $('forgotConfirmPass').addEventListener('keypress', e=>e.key==='Enter'&&forgotSavePassword());
   // OTP
   $('sendOtpBtn').addEventListener('click',sendOTP);
   $('verifyOtpBtn').addEventListener('click',verifyOTP);
@@ -3149,6 +3225,138 @@ async function saveSucursal(){
   hideLoad();
   if(r.ok){toast('Sucursal creada','success');closeModal();loadSucursales();}
   else toast('Error al crear','error');
+}
+
+
+// ═══════════════════════════════════════════════════
+// FORGOT PASSWORD
+// ═══════════════════════════════════════════════════
+let _forgotEmail = '', _forgotUserId = '';
+
+function showForgot(){
+  $('loginScreen').classList.add('hidden');
+  $('forgotScreen').classList.remove('hidden');
+  $('forgotStep1').classList.remove('hidden');
+  $('forgotStep2').classList.add('hidden');
+  $('forgotStep3').classList.add('hidden');
+  $('forgotErr').classList.add('hidden');
+  $('forgotEmail').value = '';
+}
+
+function hideForgot(){
+  $('forgotScreen').classList.add('hidden');
+  $('loginScreen').classList.remove('hidden');
+}
+
+async function forgotSendCode(){
+  const email = $('forgotEmail').value.trim();
+  if(!email || !email.includes('@')){ showAErr('forgotErr','Ingresa tu email'); return; }
+
+  showLoad();
+  try{
+    // Check email exists
+    const r = await _realSb(`/rest/v1/usuarios?login=eq.${encodeURIComponent(email)}&activo=eq.true&select=id`);
+    if(!r.ok || !r.data.length){
+      showAErr('forgotErr','No encontramos una cuenta con ese email');
+      hideLoad(); return;
+    }
+    _forgotUserId = r.data[0].id;
+    _forgotEmail  = email;
+
+    // Generate OTP
+    const code = String(Math.floor(100000 + Math.random()*900000));
+    const expires = new Date(Date.now() + 10*60*1000).toISOString();
+
+    // Delete old reset codes for this email
+    await _realSb(`/rest/v1/otp_codes?email=eq.${encodeURIComponent(email)}&type=eq.reset`, {method:'DELETE'});
+
+    // Save new code
+    await _realSb('/rest/v1/otp_codes', {method:'POST',
+      body: JSON.stringify({email, code, type:'reset', expires_at:expires})
+    });
+
+    // Send email
+    await sendEmailViaWorker(email, 'Restablece tu contraseña — OperixERP', 'reset', code);
+
+    hideLoad();
+    $('forgotStep1').classList.add('hidden');
+    $('forgotStep2').classList.remove('hidden');
+    $('forgotEmailHint').textContent = 'Código enviado a ' + email;
+    $('forgotErr2').classList.add('hidden');
+    $('forgotOtpInput').value = '';
+    $('forgotOtpInput').focus();
+    toast('Código enviado a ' + email, 'success', 4000);
+
+  }catch(e){ showAErr('forgotErr', 'Error: '+e.message); hideLoad(); }
+}
+
+async function forgotVerifyCode(){
+  const input = ($('forgotOtpInput').value || '').trim();
+  if(input.length !== 6){ showAErr('forgotErr2','Ingresa el código de 6 dígitos'); return; }
+
+  showLoad();
+  try{
+    const r = await _realSb(`/rest/v1/otp_codes?email=eq.${encodeURIComponent(_forgotEmail)}&code=eq.${input}&type=eq.reset&select=*`);
+    if(!r.ok || !r.data.length){ showAErr('forgotErr2','Código incorrecto'); hideLoad(); return; }
+    const otp = r.data[0];
+    if(new Date(otp.expires_at) < new Date()){ showAErr('forgotErr2','Código expirado. Solicita uno nuevo.'); hideLoad(); return; }
+
+    // Mark OTP as used
+    await _realSb(`/rest/v1/otp_codes?id=eq.${otp.id}`, {method:'DELETE'});
+
+    hideLoad();
+    $('forgotStep2').classList.add('hidden');
+    $('forgotStep3').classList.remove('hidden');
+    $('forgotErr3').classList.add('hidden');
+    $('forgotNewPass').value = '';
+    $('forgotConfirmPass').value = '';
+    $('forgotNewPass').focus();
+
+  }catch(e){ showAErr('forgotErr2','Error: '+e.message); hideLoad(); }
+}
+
+async function forgotSavePassword(){
+  const newPass    = $('forgotNewPass').value.trim();
+  const confirmPass = $('forgotConfirmPass').value.trim();
+  if(!newPass || newPass.length < 6){ showAErr('forgotErr3','Mínimo 6 caracteres'); return; }
+  if(newPass !== confirmPass){ showAErr('forgotErr3','Las contraseñas no coinciden'); return; }
+  if(!_forgotUserId){ showAErr('forgotErr3','Sesión expirada. Vuelve a intentarlo.'); return; }
+
+  showLoad();
+  try{
+    const r = await _realSb(`/rest/v1/usuarios?id=eq.${_forgotUserId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({password: newPass, updated_at: new Date().toISOString()})
+    });
+    hideLoad();
+    if(r.ok){
+      toast('✓ Contraseña actualizada correctamente', 'success', 4000);
+      _forgotEmail = ''; _forgotUserId = '';
+      // Auto-fill login and redirect
+      setTimeout(()=>{
+        $('forgotScreen').classList.add('hidden');
+        $('loginScreen').classList.remove('hidden');
+        $('loginUser').value = _forgotEmail || '';
+        $('loginPass').value = '';
+        $('loginPass').focus();
+      }, 1500);
+    } else {
+      showAErr('forgotErr3','Error al actualizar contraseña');
+    }
+  }catch(e){ showAErr('forgotErr3','Error: '+e.message); hideLoad(); }
+}
+
+async function forgotResend(){
+  if(!_forgotEmail){ toast('Vuelve al paso anterior','warn'); return; }
+  showLoad();
+  const code = String(Math.floor(100000 + Math.random()*900000));
+  await _realSb(`/rest/v1/otp_codes?email=eq.${encodeURIComponent(_forgotEmail)}&type=eq.reset`, {method:'DELETE'});
+  await _realSb('/rest/v1/otp_codes', {method:'POST',
+    body: JSON.stringify({email:_forgotEmail, code, type:'reset', expires_at:new Date(Date.now()+10*60*1000).toISOString()})
+  });
+  await sendEmailViaWorker(_forgotEmail, 'Tu nuevo código — OperixERP', 'reset', code);
+  hideLoad();
+  toast('Código reenviado a ' + _forgotEmail, 'success', 3000);
 }
 
 
