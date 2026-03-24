@@ -1536,7 +1536,7 @@ async function doLogin(){
     const neg=nr.data&&nr.data[0];
     if(neg&&neg.plan==='blocked'){showAErr('loginErr','Cuenta suspendida. Contacta soporte.');return;}
     S.user={id:usr.id,name:usr.nombre,login:usr.login,role:usr.rol,nid:usr.negocio_id,perms:usr.permisos||{},bizName:neg?neg.nombre:''};
-    sessionStorage.setItem('ox_user',JSON.stringify(S.user));
+    sessionStorage.setItem('ox_user',JSON.stringify(S.user));localStorage.setItem('ox_session',JSON.stringify(S.user));
     startApp();
   }catch(e){showAErr('loginErr','Error de conexión');}
   finally{hideLoad();}
@@ -1676,22 +1676,29 @@ function showLogin(){$('registerScreen').classList.add('hidden');$('loginScreen'
 
 // START APP
 async function startApp(){
-  // Redirect to slug subdomain if not already there
+  // Redirect to slug subdomain if not already on it
   const host=window.location.hostname;
   const base='operixerp.cloud';
   const isApex=host===base||host==='www.'+base;
   if(isApex&&S.user?.nid){
-    // Fetch slug for this negocio
     try{
-      const r=await _realSb(`/rest/v1/negocios?id=eq.${S.user.nid}&select=slug`);
-      const slug=r.data&&r.data[0]&&r.data[0].slug;
-      if(slug){
-        // Save session so it's available on the subdomain
-        sessionStorage.setItem('ox_user',JSON.stringify(S.user));
-        window.location.href='https://'+slug+'.'+base;
+      const res=await fetch(SB+'/rest/v1/negocios?id=eq.'+S.user.nid+'&select=slug',{
+        headers:{apikey:SK,Authorization:'Bearer '+SK}
+      });
+      const data=await res.json();
+      const slug=data&&data[0]&&data[0].slug;
+      if(slug&&slug.trim()){
+        // Use localStorage so session survives cross-domain redirect
+        localStorage.setItem('ox_session',JSON.stringify(S.user));
+        window.location.href='https://'+slug.trim()+'.'+base;
         return;
       }
-    }catch(e){console.warn('Slug redirect error:',e);}
+    }catch(e){console.warn('Slug redirect:',e);}
+  }
+  // Restore session from localStorage if came from redirect
+  if(!S.user){
+    const saved=localStorage.getItem('ox_session');
+    if(saved){try{S.user=JSON.parse(saved);}catch{}}
   }
   $('loginScreen').classList.add('hidden');$('registerScreen').classList.add('hidden');
   $('appScreen').classList.remove('hidden');
@@ -1700,8 +1707,6 @@ async function startApp(){
   await Promise.all([loadProds(),loadClients()]);
   showSec('dashboard');
   setDesktop(localStorage.getItem('ox_desktop')==='1');
-  window.addEventListener('online',()=>{$('offlineBadge').classList.add('hidden');});
-  window.addEventListener('offline',()=>{$('offlineBadge').classList.remove('hidden');});
 }
 
 // NAV
@@ -2795,6 +2800,16 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   const magicLogin=await checkMagicLink();
   if(magicLogin){startApp();return;}
 
+  // Check localStorage session (from cross-domain redirect)
+  const crossSess=localStorage.getItem('ox_session');
+  if(crossSess){
+    try{
+      S.user=JSON.parse(crossSess);
+      localStorage.removeItem('ox_session'); // consume it
+      sessionStorage.setItem('ox_user',JSON.stringify(S.user)); // move to session
+      startApp();return;
+    }catch{localStorage.removeItem('ox_session');}
+  }
   const saved=sessionStorage.getItem('ox_user');
   if(saved){try{S.user=JSON.parse(saved);startApp();}catch{sessionStorage.removeItem('ox_user');}}
 });
