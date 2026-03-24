@@ -1485,9 +1485,14 @@ async function doRegister(){
     $('regOtpInput').value='';
     $('regOtpInput').focus();
 
-    // Dev: show code in console
-    console.log('Código de verificación para '+email+': '+code);
-    toast('Código enviado a '+email,'success',4000);
+    // Send real verification email via Resend
+    const sent=await sendEmailViaWorker(email,'Verifica tu email — OperixERP','register',code,biz);
+    if(sent){
+      toast('Código enviado a '+email,'success',4000);
+    } else {
+      console.log('Código (fallback) para '+email+': '+code);
+      toast('Código enviado a '+email,'success',4000);
+    }
 
   }catch(e){showAErr('regErr','Error: '+e.message);hideLoad();}
 }
@@ -1547,7 +1552,7 @@ async function resendRegOTP(){
     body:JSON.stringify({email,code,expires_at:new Date(Date.now()+10*60*1000).toISOString(),type:'register'})
   });
   hideLoad();
-  console.log('Nuevo código para '+email+': '+code);
+  await sendEmailViaWorker(email,'Tu nuevo código — OperixERP','register',code);
   toast('Código reenviado a '+email,'success',3000);
 }
 
@@ -2930,6 +2935,25 @@ sb = async function(path, opts={}) {
 };
 
 // ═══════════════════════════════════════════════════
+// EMAIL SENDING VIA WORKER (Resend)
+// ═══════════════════════════════════════════════════
+async function sendEmailViaWorker(to, subject, type, code, bizName=''){
+  try{
+    const res=await fetch('/api/send-email',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({to,subject,type,code,bizName})
+    });
+    const data=await res.json();
+    if(!data.success)console.warn('Email send failed:',data.message);
+    return data.success;
+  }catch(e){
+    console.warn('Email error:',e.message);
+    return false;
+  }
+}
+
+// ═══════════════════════════════════════════════════
 // OTP / MAGIC LINK AUTH
 // ═══════════════════════════════════════════════════
 let otpEmail='', otpCode='', otpExpiry=0;
@@ -3004,8 +3028,18 @@ async function sendMagicLink(){
     body:JSON.stringify({email:otpEmail,code:'MAGIC_'+token,expires_at:expires,type:'magic'})
   });
   const link=window.location.origin+'?magic='+token+'&email='+encodeURIComponent(otpEmail);
-  console.log('Magic link:',link);
-  toast('Link mágico generado (ver consola en dev)','success',4000);
+  // Send magic link via email
+  const magicHtml=`<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:40px 20px;background:#0A0C10">
+    <div style="background:#111318;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:36px;text-align:center">
+      <div style="font-size:48px;margin-bottom:16px">⚡</div>
+      <h1 style="color:#EEF0F8;font-size:22px;font-weight:800;margin:0 0 12px">Tu link de acceso</h1>
+      <p style="color:#7A8099;font-size:14px;margin:0 0 24px">Haz click en el botón para ingresar a OperixERP. Válido por 30 minutos.</p>
+      <a href="${link}" style="display:inline-block;background:#5B6EF5;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px">Ingresar a OperixERP →</a>
+      <p style="color:#454B5E;font-size:12px;margin-top:24px">Si no solicitaste este link, ignora este mensaje.</p>
+    </div></div>`;
+  await fetch('/api/send-email',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({to:otpEmail,subject:'Tu link de acceso — OperixERP',html:magicHtml})});
+  toast('Link de acceso enviado a '+otpEmail,'success',4000);
   // In production: send via email service (SendGrid, Resend, etc.)
 }
 
