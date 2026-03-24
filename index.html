@@ -902,18 +902,46 @@ body.desktop #toasts{bottom:20px}
 <!-- REGISTER -->
 <div id="registerScreen" class="screen hidden">
   <div class="auth-box">
-    <div class="auth-logo">
-      <div class="auth-icon">🚀</div>
-      <h1>Nueva Tienda</h1>
-      <p>Crea tu negocio en segundos</p>
+
+    <!-- STEP 1: Form -->
+    <div id="regStep1">
+      <div class="auth-logo">
+        <div class="auth-icon">🚀</div>
+        <h1>Nueva Tienda</h1>
+        <p>Crea tu negocio en segundos</p>
+      </div>
+      <div id="regErr" class="auth-err hidden"></div>
+      <div class="form-group"><label>Nombre del negocio *</label><input type="text" id="regBiz" placeholder="Minimarket Ana"></div>
+      <div class="form-group"><label>Tu nombre *</label><input type="text" id="regName" placeholder="Ana González"></div>
+      <div class="form-group"><label>Email *</label><input type="email" id="regEmail" placeholder="ana@email.com"></div>
+      <div class="form-group"><label>Contraseña *</label><input type="password" id="regPass" placeholder="Mínimo 6 caracteres"></div>
+      <button class="btn btn-primary btn-lg" id="regBtn">Continuar →</button>
+      <p class="auth-link">¿Ya tienes cuenta? <span id="goLogin">Iniciar sesión</span></p>
     </div>
-    <div id="regErr" class="auth-err hidden"></div>
-    <div class="form-group"><label>Nombre del negocio *</label><input type="text" id="regBiz" placeholder="Minimarket Ana"></div>
-    <div class="form-group"><label>Tu nombre *</label><input type="text" id="regName" placeholder="Ana González"></div>
-    <div class="form-group"><label>Email *</label><input type="email" id="regEmail" placeholder="ana@email.com"></div>
-    <div class="form-group"><label>Contraseña *</label><input type="password" id="regPass" placeholder="Mínimo 6 caracteres"></div>
-    <button class="btn btn-primary btn-lg" id="regBtn">Crear mi tienda</button>
-    <p class="auth-link">¿Ya tienes cuenta? <span id="goLogin">Iniciar sesión</span></p>
+
+    <!-- STEP 2: Email verification -->
+    <div id="regStep2" class="hidden">
+      <div class="auth-logo">
+        <div class="auth-icon">📧</div>
+        <h1>Verifica tu email</h1>
+        <p id="regVerifyHint">Enviamos un código a tu correo</p>
+      </div>
+      <div id="regErr2" class="auth-err hidden"></div>
+      <div class="form-group">
+        <label>Código de verificación</label>
+        <input type="text" id="regOtpInput" placeholder="000000" maxlength="6" autocomplete="one-time-code"
+          style="text-align:center;font-family:var(--mono);font-size:28px;font-weight:800;letter-spacing:0.15em">
+      </div>
+      <div style="background:var(--accent-glow2);border:1px solid var(--accent-glow);border-radius:var(--r);padding:10px 13px;font-size:12px;color:var(--text2);margin-bottom:14px">
+        El código expira en <strong style="color:var(--text)">10 minutos</strong>. Si no llega, revisa tu carpeta de spam.
+      </div>
+      <button class="btn btn-primary btn-lg" id="regVerifyBtn">✓ Verificar y crear tienda</button>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-outline" style="flex:1" id="regBackBtn">← Volver</button>
+        <button class="btn btn-ghost" style="flex:1" id="regResendBtn">↻ Reenviar código</button>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1415,25 +1443,112 @@ async function doLogin(){
   finally{hideLoad();}
 }
 
+// Pending registration data (stored while waiting for OTP)
+let _pendingReg = null;
+
 async function doRegister(){
-  const biz=$('regBiz').value.trim(),name=$('regName').value.trim(),email=$('regEmail').value.trim(),pass=$('regPass').value.trim();
+  const biz=$('regBiz').value.trim(),name=$('regName').value.trim(),
+        email=$('regEmail').value.trim(),pass=$('regPass').value.trim();
   if(!biz||!name||!email||!pass){showAErr('regErr','Completa todos los campos');return;}
   if(pass.length<6){showAErr('regErr','Contraseña mínimo 6 caracteres');return;}
+  if(!email.includes('@')||!email.includes('.')){showAErr('regErr','Email inválido');return;}
+
   showLoad();
   try{
-    const slug=biz.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,28)+'-'+Date.now().toString(36);
-    const nr=await sb('/rest/v1/negocios',{method:'POST',body:JSON.stringify({nombre:biz,email,slug})});
-    if(!nr.ok){showAErr('regErr','Error al crear negocio');return;}
+    // Check email not already registered
+    const existing=await _realSb(`/rest/v1/usuarios?login=eq.${encodeURIComponent(email)}&select=id`);
+    if(existing.ok&&existing.data.length){
+      showAErr('regErr','Este email ya tiene una cuenta. Inicia sesión.');
+      hideLoad();return;
+    }
+
+    // Generate and store OTP
+    const code=String(Math.floor(100000+Math.random()*900000));
+    const expires=new Date(Date.now()+10*60*1000).toISOString();
+    const otpR=await _realSb('/rest/v1/otp_codes',{method:'POST',
+      body:JSON.stringify({email,code,expires_at:expires,type:'register'})
+    });
+
+    if(!otpR.ok){showAErr('regErr','Error al enviar código. Intenta de nuevo.');hideLoad();return;}
+
+    // Save pending registration
+    _pendingReg={biz,name,email,pass,
+      slug:biz.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,28)+'-'+Date.now().toString(36)
+    };
+
+    hideLoad();
+    // Show OTP step
+    $('regStep1').classList.add('hidden');
+    $('regStep2').classList.remove('hidden');
+    $('regVerifyHint').textContent='Enviamos el código a '+email;
+    $('regErr2').classList.add('hidden');
+    $('regOtpInput').value='';
+    $('regOtpInput').focus();
+
+    // Dev: show code in console
+    console.log('Código de verificación para '+email+': '+code);
+    toast('Código enviado a '+email,'success',4000);
+
+  }catch(e){showAErr('regErr','Error: '+e.message);hideLoad();}
+}
+
+async function verifyRegOTP(){
+  const input=($('regOtpInput').value||'').trim();
+  if(input.length!==6){showAErr('regErr2','Ingresa el código de 6 dígitos');return;}
+  if(!_pendingReg){showAErr('regErr2','Sesión expirada. Vuelve a intentarlo.');return;}
+
+  showLoad();
+  try{
+    const {email,biz,name,pass,slug}=_pendingReg;
+
+    // Verify OTP
+    const otpR=await _realSb(`/rest/v1/otp_codes?email=eq.${encodeURIComponent(email)}&code=eq.${input}&type=eq.register&select=*`);
+    if(!otpR.ok||!otpR.data.length){showAErr('regErr2','Código incorrecto');hideLoad();return;}
+    const otp=otpR.data[0];
+    if(new Date(otp.expires_at)<new Date()){showAErr('regErr2','El código expiró. Haz click en "Reenviar"');hideLoad();return;}
+
+    // Delete used OTP
+    await _realSb(`/rest/v1/otp_codes?id=eq.${otp.id}`,{method:'DELETE'});
+
+    // NOW create the account
+    const nr=await _realSb('/rest/v1/negocios',{method:'POST',body:JSON.stringify({nombre:biz,email,slug,email_verified:true})});
+    if(!nr.ok){showAErr('regErr2','Error al crear negocio');hideLoad();return;}
     const neg=nr.data[0];
-    const ur=await sb('/rest/v1/usuarios',{method:'POST',body:JSON.stringify({negocio_id:neg.id,nombre:name,login:email,password:pass,rol:'admin'})});
-    if(!ur.ok){showAErr('regErr','Error al crear usuario');return;}
-    await sb('/rest/v1/configuracion',{method:'POST',body:JSON.stringify({negocio_id:neg.id,business_name:biz})});
+
+    const ur=await _realSb('/rest/v1/usuarios',{method:'POST',body:JSON.stringify({
+      negocio_id:neg.id,nombre:name,login:email,password:pass,rol:'admin',email_verified:true
+    })});
+    if(!ur.ok){showAErr('regErr2','Error al crear usuario');hideLoad();return;}
+
+    await _realSb('/rest/v1/configuracion',{method:'POST',body:JSON.stringify({negocio_id:neg.id,business_name:biz})});
     try{await fetch('/api/create-subdomain',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug,negocio_id:neg.id})});}catch{}
-    toast('¡Tienda creada!','success',3000);
-    $('loginUser').value=email;$('loginPass').value=pass;
-    showLogin();setTimeout(doLogin,400);
-  }catch(e){showAErr('regErr','Error: '+e.message);}
-  finally{hideLoad();}
+
+    _pendingReg=null;
+    hideLoad();
+    toast('🎉 ¡Tienda creada! Iniciando sesión...','success',3000);
+
+    // Auto-login
+    $('loginUser').value=email;
+    $('loginPass').value=pass;
+    showLogin();
+    setTimeout(doLogin,600);
+
+  }catch(e){showAErr('regErr2','Error: '+e.message);hideLoad();}
+}
+
+async function resendRegOTP(){
+  if(!_pendingReg){toast('Vuelve al formulario e ingresa tu email','warn');return;}
+  const {email}=_pendingReg;
+  showLoad();
+  // Delete old OTPs for this email
+  await _realSb(`/rest/v1/otp_codes?email=eq.${encodeURIComponent(email)}&type=eq.register`,{method:'DELETE'});
+  const code=String(Math.floor(100000+Math.random()*900000));
+  await _realSb('/rest/v1/otp_codes',{method:'POST',
+    body:JSON.stringify({email,code,expires_at:new Date(Date.now()+10*60*1000).toISOString(),type:'register'})
+  });
+  hideLoad();
+  console.log('Nuevo código para '+email+': '+code);
+  toast('Código reenviado a '+email,'success',3000);
 }
 
 function doLogout(){
@@ -2237,6 +2352,16 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   $('regBtn').addEventListener('click',doRegister);
   $('regPass').addEventListener('keypress',e=>e.key==='Enter'&&doRegister());
   $('goLogin').addEventListener('click',showLogin);
+  // Register OTP verification
+  $('regVerifyBtn').addEventListener('click',verifyRegOTP);
+  $('regOtpInput').addEventListener('keypress',e=>e.key==='Enter'&&verifyRegOTP());
+  $('regOtpInput').addEventListener('input',function(){this.value=this.value.replace(/[^0-9]/g,'').slice(0,6);});
+  $('regBackBtn').addEventListener('click',()=>{
+    $('regStep2').classList.add('hidden');
+    $('regStep1').classList.remove('hidden');
+    $('regErr').classList.add('hidden');
+  });
+  $('regResendBtn').addEventListener('click',resendRegOTP);
   // OTP
   $('sendOtpBtn').addEventListener('click',sendOTP);
   $('verifyOtpBtn').addEventListener('click',verifyOTP);
