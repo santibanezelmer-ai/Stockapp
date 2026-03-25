@@ -2179,7 +2179,7 @@ function renderInv(){
   const g=$('invGrid');
   if(!prods.length){g.innerHTML='<div class="empty-state" style="grid-column:span 2"><div class="icon">📦</div><p>Sin productos</p></div>';return;}
   const hl=(txt,q)=>q?txt.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'),'<mark style="background:var(--glow);color:var(--accent2);border-radius:2px">$1</mark>'):esc(txt);
-  g.innerHTML=prods.map(p=>{const sc=p.stock===0?'stk-out':p.stock<=p.minStock?'stk-low':'stk-ok';const sl=p.stock===0?'❌':p.stock<=p.minStock?'⚠ '+p.stock:'✓ '+p.stock;return`<div class="inv-card"><div class="inv-img" style="cursor:${p.gallery&&p.gallery.length>1?'pointer':'default'}" ${p.gallery&&p.gallery.length>1?`onclick="cycleInvImg(this,'${p.id}')"`:''}>${p.img?`<img src="${esc(p.img)}" loading="lazy" data-pid="${p.id}">`:'📦'}${p.gallery&&p.gallery.length>1?`<div class="prod-img-dots">${p.gallery.slice(0,4).map((_,i)=>`<div class="prod-img-dot${i===0?' active':''}"></div>`).join('')}</div>`:''}</div><div class="inv-body"><div class="inv-name">${hl(p.name,q)}</div><div class="inv-row"><div class="inv-price">${fmt(p.price)}${p.unit!=='unidad'?' /'+p.unit:''}</div><span class="inv-stk ${sc}">${sl}</span></div></div><div class="inv-actions"><button class="btn btn-outline" data-id="${p.id}" data-a="edit">✏️</button><button class="btn btn-ghost" data-id="${p.id}" data-pn="${esc(p.name)}" data-a="priceHist" title="Historial precios">📈</button><button class="btn btn-danger" data-id="${p.id}" data-n="${esc(p.name)}" data-a="del">🗑</button></div></div>`;}).join('');
+  g.innerHTML=prods.map(p=>{const sc=p.stock===0?'stk-out':p.stock<=p.minStock?'stk-low':'stk-ok';const sl=p.stock===0?'❌':p.stock<=p.minStock?'⚠ '+p.stock:'✓ '+p.stock;return`<div class="inv-card"><div class="inv-img" style="cursor:${p.gallery&&p.gallery.length>1?'pointer':'default'}" ${p.gallery&&p.gallery.length>1?`onclick="cycleInvImg(this,'${p.id}')"`:''}>${p.img?`<img src="${esc(p.img)}" loading="lazy" data-pid="${p.id}">`:'📦'}${p.gallery&&p.gallery.length>1?`<div class="prod-img-dots">${p.gallery.slice(0,4).map((_,i)=>`<div class="prod-img-dot${i===0?' active':''}"></div>`).join('')}</div>`:''}</div><div class="inv-body"><div class="inv-name">${hl(p.name,q)}</div><div class="inv-row"><div class="inv-price">${fmt(p.price)}${p.unit!=='unidad'?' /'+p.unit:''}</div><span class="inv-stk ${sc}">${sl}</span></div></div><div class="inv-actions"><button class="btn btn-outline" data-id="${p.id}" data-a="edit">✏️</button><button class="btn btn-ghost" data-id="${p.id}" data-pn="${esc(p.name)}" data-a="priceHist" title="Historial precios">📈</button><button class="btn btn-danger" data-id="${p.id}" data-n="${esc(p.name)}" data-a="del">🗑</button><button class="btn btn-ghost" data-id="${p.id}" data-a="dup" title="Duplicar" style="padding:6px 8px;font-size:12px">⧉</button></div></div>`;}).join('');
 }
 
 function showProdForm(p=null){
@@ -2990,7 +2990,7 @@ document.addEventListener('DOMContentLoaded',async ()=>{
       addToCart(pc.dataset.pid);return;
     }
     // Inventory actions
-    const ia=e.target.closest('.inv-actions [data-a]');if(ia){const id=ia.dataset.id,n=ia.dataset.n,a=ia.dataset.a;if(a==='edit'){const p=S.products.find(p=>p.id===id);showProdForm(p);}if(a==='del')delProd(id,n);if(a==='priceHist')showPriceHistory(id,ia.dataset.pn||n||'');return;}
+    const ia=e.target.closest('.inv-actions [data-a]');if(ia){const id=ia.dataset.id,n=ia.dataset.n,a=ia.dataset.a;if(a==='edit'){const p=S.products.find(p=>p.id===id);showProdForm(p);}if(a==='del')delProd(id,n);if(a==='priceHist')showPriceHistory(id,ia.dataset.pn||n||'');if(a==='dup')duplicateProd(id);return;}
     // Data actions
     const da=e.target.closest('[data-a]');if(da){
       const a=da.dataset.a;
@@ -3014,7 +3014,7 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   $('invCat').addEventListener('change',renderInv);
   $('lowStockBtn').addEventListener('click',function(){S.invLow=!S.invLow;this.classList.toggle('active',S.invLow);renderInv();});
   $('sortPriceBtn').addEventListener('click',function(){S.invSortAsc=!S.invSortAsc;this.textContent=S.invSortAsc?'💰 Precio ↑':'💰 Precio ↓';renderInv();});
-  $('exportInvBtn').addEventListener('click',exportProds);
+  $('exportInvBtn').addEventListener('click',exportInvCSV);
   $('importInvBtn').addEventListener('click',()=>$('importFile').click());
   $('importFile').addEventListener('change',e=>{importProds(e.target.files[0]);e.target.value='';});
 
