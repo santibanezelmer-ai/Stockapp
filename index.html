@@ -3196,10 +3196,31 @@ async function saveDevolution(){
     const found=(vR.data||[]).find(v=>v.id.endsWith(ventaIdRaw)||v.id.slice(-6)===ventaIdRaw);
     ventaId=found?found.id:null;
   }
-  const r=await sb('/rest/v1/devoluciones',{method:'POST',body:JSON.stringify({negocio_id:S.user.nid,tipo:$('devTipo').value,motivo,monto,descripcion:$('devDesc').value.trim(),venta_id:ventaId,stock_restituido:$('devRestStock').checked,usuario_id:S.user.id})});
+  const restStock=$('devRestStock').checked;
+  const r=await sb('/rest/v1/devoluciones',{method:'POST',body:JSON.stringify({negocio_id:S.user.nid,tipo:$('devTipo').value,motivo,monto,descripcion:$('devDesc').value.trim(),venta_id:ventaId,stock_restituido:restStock,usuario_id:S.user.id})});
+
+  // Restore stock if requested
+  if(r.ok&&restStock&&ventaId){
+    try{
+      const dvR=await sb(`/rest/v1/detalle_ventas?venta_id=eq.${ventaId}&select=producto_id,cantidad`);
+      for(const dv of dvR.data||[]){
+        const pr=await sb(`/rest/v1/productos?id=eq.${dv.producto_id}&select=stock`);
+        if(pr.data&&pr.data[0]){
+          const newStock=parseInt(pr.data[0].stock||0)+parseInt(dv.cantidad||1);
+          await sb(`/rest/v1/productos?id=eq.${dv.producto_id}`,{method:'PATCH',body:JSON.stringify({stock:newStock})});
+        }
+      }
+      auditLog('stock_ajuste',{motivo:'Devolución: '+motivo,venta_id:ventaId});
+    }catch(e){console.warn('Stock restore error:',e);}
+  }
+
   hideLoad();
-  if(r.ok){toast('Registrado','success');closeModal();loadDevolutions();}
-  else toast('Error al guardar','error');
+  if(r.ok){
+    toast(restStock?'✓ Devuelto y stock restituido':'✓ Devolución registrada','success');
+    closeModal();
+    loadDevolutions();
+    if(restStock)await loadProds();
+  } else toast('Error al guardar','error');
 }
 
 // Cycle through product gallery images
