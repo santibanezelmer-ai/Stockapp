@@ -868,6 +868,12 @@ body.desktop #toasts{bottom:20px}
   font-size:11px;color:var(--text3);
   background:linear-gradient(to top,var(--bg) 60%,transparent);
   pointer-events:none;z-index:10;
+  transition:opacity 0.3s;
+}
+/* Hide legal footer when app is active */
+#appScreen:not(.hidden) ~ footer.site-footer,
+body.app-active footer.site-footer{
+  display:none;
 }
 .site-footer a,.site-footer span{pointer-events:all}
 .site-footer-links{display:flex;gap:16px;justify-content:center;align-items:center;margin-bottom:4px;flex-wrap:wrap}
@@ -1210,7 +1216,6 @@ body.desktop #toasts{bottom:20px}
             <button class="btn btn-outline btn-sm" id="importInvBtn">📥</button>
             <input type="file" id="importFile" accept=".csv" class="hidden">
             <button class="btn btn-primary btn-sm" id="addProdBtn">+ Producto</button>
-          </div>
           </div>
         </div>
         <div class="search-bar"><input type="text" id="invSearch" placeholder="Buscar..."></div>
@@ -1740,6 +1745,9 @@ async function resendRegOTP(){
 
 function doLogout(){
   auditLog('logout',{user:S.user?.login||''});
+  document.body.classList.remove('app-active');
+  const siteFooter=document.querySelector('footer.site-footer');
+  if(siteFooter)siteFooter.style.display='';
   if(!confirm('¿Cerrar sesión?'))return;
   S.user=null;
   sessionStorage.removeItem('ox_user');
@@ -1796,7 +1804,12 @@ async function startApp(){
   // Normal app start
   $('loginScreen').classList.add('hidden');
   $('registerScreen').classList.add('hidden');
+  $('forgotScreen').classList.add('hidden');
   $('appScreen').classList.remove('hidden');
+  // Hide legal footer in app mode
+  document.body.classList.add('app-active');
+  const siteFooter=document.querySelector('footer.site-footer');
+  if(siteFooter)siteFooter.style.display='none';
   await loadCfg();
   applyBranding();
   await Promise.all([loadProds(),loadClients()]);
