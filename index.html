@@ -572,6 +572,22 @@ body.desktop .app-content{height:calc(100vh - var(--top));padding-bottom:0}
 
 /* ══ INVENTORY ════════════════════════════════════ */
 .inv-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.inv-list-view .inv-card{
+  display:flex!important;
+  flex-direction:row!important;
+  align-items:center;
+  gap:12px;
+}
+.inv-list-view .inv-img{
+  width:56px!important;
+  height:56px!important;
+  flex-shrink:0;
+  border-radius:var(--r);
+}
+.inv-list-view .inv-body{flex:1}
+.inv-list-view .inv-actions{flex-shrink:0}
+.inv-list-view #invGrid{grid-template-columns:1fr!important}
+
 .inv-card{
   background:var(--bg2);border:1.5px solid var(--border);
   border-radius:var(--r2);overflow:hidden;transition:all 0.18s;
@@ -1984,6 +2000,7 @@ function loadCfgUI(){
   const ms=(S.cfg.methods||'').split(',');
   ['efectivo','transferencia','tarjeta','fiado'].forEach(m=>{const cb=$('pm_'+m);if(cb)cb.checked=ms.includes(m);});
   loadUsersList();
+  loadCatTags();
   // Add audit widgets if not already there
   if(!document.getElementById('auditList')) addAuditToSettings();
 }
@@ -2169,8 +2186,25 @@ async function doCheckout(){
     const saleId=sr.data[0].id;
     for(const item of S.cart){
       await sb('/rest/v1/detalle_ventas',{method:'POST',body:JSON.stringify({venta_id:saleId,negocio_id:S.user.nid,producto_id:item.id,nombre:item.name,cantidad:item.qty,precio_venta:item.price,precio_costo:item.cost||0,subtotal:item.price*item.qty})});
-      const pr=await sb(`/rest/v1/productos?id=eq.${item.id}&select=stock`);
-      if(pr.data&&pr.data[0])await sb(`/rest/v1/productos?id=eq.${item.id}`,{method:'PATCH',body:JSON.stringify({stock:Math.max(0,pr.data[0].stock-item.qty)})});
+      const pr=await sb(`/rest/v1/productos?id=eq.${item.id}&select=stock,variantes`);
+      if(pr.data&&pr.data[0]){
+        const newStock=Math.max(0,(parseInt(pr.data[0].stock)||0)-item.qty);
+        const patchData={stock:newStock};
+        // Also update variant stock if applicable
+        if(item.variant&&pr.data[0].variantes){
+          try{
+            const vars=typeof pr.data[0].variantes==='string'?JSON.parse(pr.data[0].variantes):pr.data[0].variantes;
+            let updated=false;
+            vars.forEach(g=>g.values.forEach(v=>{
+              if((v.name||v)===item.variant||(typeof item.variant==='string'&&item.variant.includes(v.name||v))){
+                v.stock=Math.max(0,(parseInt(v.stock)||0)-item.qty);updated=true;
+              }
+            }));
+            if(updated)patchData.variantes=JSON.stringify(vars);
+          }catch(e){}
+        }
+        await sb(`/rest/v1/productos?id=eq.${item.id}`,{method:'PATCH',body:JSON.stringify(patchData)});
+      }
     }
     if(S.payMethod==='fiado'&&clientId){
       await sb('/rest/v1/deudas',{method:'POST',body:JSON.stringify({negocio_id:S.user.nid,cliente_id:clientId,venta_id:saleId,monto:total,tipo:'deuda'})});
@@ -2259,24 +2293,7 @@ function showProdForm(p=null){
 }
 
 function bindAllVarImgFiles(){
-  document.querySelectorAll('.var-val-row').forEach(row=>{
-    const fi=row.querySelector('.var-val-img-file');
-    const prev=row.querySelector('.var-val-img-prev');
-    const hidden=row.querySelector('.var-val-img');
-    if(fi&&!fi._bound){
-      fi._bound=true;
-      fi.addEventListener('change',function(){
-        const file=this.files[0];if(!file)return;
-        if(file.size>800*1024){toast('Imagen muy grande (máx 800KB)','warn');return;}
-        const rd=new FileReader();
-        rd.onload=e=>{
-          hidden.value=e.target.result;
-          prev.innerHTML=`<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`;
-        };
-        rd.readAsDataURL(file);
-      });
-    }
-  });
+  document.querySelectorAll('.var-val-row').forEach(row=>setupVarImgUpload(row));
 }
 
 function buildVarRowHTML(g,i){
@@ -2995,6 +3012,7 @@ document.addEventListener('DOMContentLoaded',async ()=>{
     // Product add
     const pa=e.target.closest('.prod-add');
     if(pa){
+      e.stopPropagation(); // prevent prod-card handler from also firing
       if(pa.classList.contains('prod-add-unit')){
         const p=S.products.find(p=>p.id===pa.dataset.pid);
         if(p)showUnitQtyPicker(p);
@@ -3097,7 +3115,7 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   $('uploadLogoBtn').addEventListener('click',()=>$('logoFile').click());
   $('logoFile').addEventListener('change',function(){
     const file=this.files[0];if(!file)return;if(file.size>500*1024){toast('Imagen muy grande (máx 500KB)','warn');return;}
-    const rd=new FileReader();rd.onload=e=>{const src=e.target.result;$('logoImg').src=src;$('logoImg').classList.remove('hidden');$('logoPlaceholder').classList.add('hidden');$('topLogo').innerHTML=`<img src="${src}" style="width:100%;height:100%;object-fit:contain">`;saveCfg({logo_url:src});};rd.readAsDataURL(file);
+    const rd=new FileReader();rd.onload=e=>{const src=e.target.result;$('logoImg').src=src;$('logoImg').classList.remove('hidden');$('logoPlaceholder').classList.add('hidden');$('topLogo').innerHTML=`<img src="${src}" style="width:100%;height:100%;object-fit:contain">`;saveCfg({logo_url:src});toast('✓ Logo guardado','success');};rd.readAsDataURL(file);
   });
   $('urlLogoBtn').addEventListener('click',()=>{const inp=$('logoUrlInp');inp.classList.toggle('hidden');if(!inp.classList.contains('hidden')){inp.focus();inp.addEventListener('change',()=>{const url=inp.value.trim();if(url){$('logoImg').src=url;$('logoImg').classList.remove('hidden');$('logoPlaceholder').classList.add('hidden');$('topLogo').innerHTML=`<img src="${esc(url)}" style="width:100%;height:100%;object-fit:contain">`;saveCfg({logo_url:url});}},{once:true});}});
   $('rmLogoBtn').addEventListener('click',()=>{$('logoImg').classList.add('hidden');$('logoImg').src='';$('logoPlaceholder').classList.remove('hidden');$('topLogo').innerHTML='⚡';$('logoUrlInp').value='';saveCfg({logo_url:''});});
@@ -3220,7 +3238,7 @@ function addVarValue(btn){
   fileInp.addEventListener('change',function(){
     const file=this.files[0];if(!file)return;
     if(file.size>800*1024){toast('Imagen muy grande (máx 800KB)','warn');return;}
-    const rd=new FileReader();rd.onload=e=>{hidden.value=e.target.result;prev.innerHTML=`<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`;};rd.readAsDataURL(file);
+    const rd=new FileReader();rd.onload=e=>{hidden.value=e.target.result;prev.innerHTML=`<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`;toast('✓ Imagen cargada','success');};rd.readAsDataURL(file);
   });
   row.querySelector('.var-val-name').focus();
 }
@@ -3319,12 +3337,17 @@ window.varPickSel=function(group,value){
 };
 
 
-function addToCartWithVariant(p,varLabel){
+function addToCartWithVariant(p,varLabel,varGroupIdx,varValueIdx){
   const displayName=varLabel?`${p.name} (${varLabel})`:p.name;
   const key=varLabel?`${p.id}__${varLabel}`:p.id;
   const existing=S.cart.findIndex(i=>i._key===key);
   if(existing>=0)S.cart[existing].qty++;
-  else S.cart.push({id:p.id,_key:key,name:displayName,price:p.price,cost:p.cost,qty:1,unit:p.unit||'unidad',variant:varLabel});
+  else S.cart.push({
+    id:p.id,_key:key,name:displayName,
+    price:p.price,cost:p.cost,qty:1,
+    unit:p.unit||'unidad',variant:varLabel,
+    varGroupIdx,varValueIdx
+  });
   updateCart();renderProdGrid($('salesSearch').value);
 }
 // ═══════════════════════════════════════════════════
@@ -5282,6 +5305,234 @@ async function redirectToSubdomain(user){
   // No slug found - start app on apex as fallback
   startApp();
 }
+
+
+// ── FIX 5: Inventory view toggle ─────────────────────────────────────────
+function toggleInvView(){
+  const grid=document.getElementById('invGrid');
+  const btn=document.getElementById('invViewBtn');
+  if(!grid)return;
+  S.invListView=!S.invListView;
+  grid.parentElement.classList.toggle('inv-list-view',S.invListView);
+  btn.textContent=S.invListView?'⊟':'⊞';
+  btn.title=S.invListView?'Vista cuadrícula':'Vista lista';
+}
+
+// ── FIX 4: Category manager ───────────────────────────────────────────────
+function loadCatTags(){
+  const cats=[...new Set((S.products||[]).map(p=>p.cat).filter(Boolean))].sort();
+  const el=document.getElementById('catTagsList');
+  if(!el)return;
+  if(!cats.length){el.innerHTML='<span style="font-size:12px;color:var(--text3)">Sin categorías aún</span>';return;}
+  el.innerHTML=cats.map(c=>`<span style="background:var(--surface);border:1px solid var(--border2);border-radius:100px;padding:3px 10px;font-size:12px;display:flex;align-items:center;gap:6px">${esc(c)}<button onclick="renameCat('${esc(c)}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;padding:0 2px">✏</button></span>`).join('');
+}
+
+function showCatManager(){
+  const cats=[...new Set((S.products||[]).map(p=>p.cat).filter(Boolean))].sort();
+  openModal('🏷 Gestionar Categorías',
+    `<p style="font-size:13px;color:var(--text2);margin-bottom:14px">Renombra o fusiona categorías. Se actualiza en todos los productos.</p>
+    <div style="display:flex;flex-direction:column;gap:8px" id="catMgrList">
+      ${cats.map(c=>`
+        <div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:var(--r);padding:8px 12px">
+          <span style="flex:1;font-size:13px;font-weight:600">${esc(c)}</span>
+          <button class="btn btn-outline btn-sm" onclick="renameCat('${esc(c)}')">✏ Renombrar</button>
+        </div>`).join('')}
+    </div>
+    <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+      <div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:8px">Nueva categoría</div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="newCatInput" placeholder="Ej: Maquillaje" style="flex:1;padding:8px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px">
+        <button class="btn btn-primary btn-sm" onclick="createCat()">+ Crear</button>
+      </div>
+    </div>`,
+    `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>`
+  );
+}
+
+async function renameCat(oldName){
+  const newName=prompt(`Renombrar "${oldName}" a:`,oldName);
+  if(!newName||newName===oldName)return;
+  showLoad();
+  // Update all products with this category
+  const prods=(S.products||[]).filter(p=>p.cat===oldName);
+  for(const p of prods){
+    await sb(`/rest/v1/productos?id=eq.${p.id}`,{method:'PATCH',body:JSON.stringify({categoria:newName})});
+  }
+  hideLoad();
+  toast(`✓ "${oldName}" → "${newName}" (${prods.length} productos)`, 'success');
+  await loadProds();
+  loadInv();
+  closeModal();
+  loadCatTags();
+}
+
+async function createCat(){
+  const name=document.getElementById('newCatInput')?.value.trim();
+  if(!name){toast('Ingresa un nombre','warn');return;}
+  toast(`Categoría "${name}" creada. Asígnala a productos en inventario.`,'success');
+  closeModal();
+}
+
+// ── FIX 6: Variant image upload - bind properly ───────────────────────────
+function setupVarImgUpload(row){
+  const fi=row.querySelector('.var-val-img-file');
+  const prev=row.querySelector('.var-val-img-prev');
+  const hidden=row.querySelector('.var-val-img');
+  if(!fi||fi._bound)return;
+  fi._bound=true;
+  // Click on preview opens file picker
+  if(prev)prev.onclick=()=>fi.click();
+  fi.addEventListener('change',function(){
+    const file=this.files[0];
+    if(!file){return;}
+    if(file.size>800*1024){toast('Imagen muy grande (máx 800KB)','warn');return;}
+    const rd=new FileReader();
+    rd.onload=e=>{
+      const src=e.target.result;
+      if(hidden)hidden.value=src;
+      if(prev){
+        prev.innerHTML=`<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:var(--r)">`;
+        prev.style.border='1.5px solid var(--accent)';
+      }
+      toast('✓ Imagen de variante cargada','success');
+    };
+    rd.readAsDataURL(file);
+    this.value='';
+  });
+}
+
+
+// ═══════════════════════════════════════════════════
+// INVENTORY VIEW TOGGLE + CATEGORY MANAGER
+// ═══════════════════════════════════════════════════
+
+let _invView = 'grid'; // 'grid' or 'list'
+
+function toggleInvView(){
+  _invView = _invView === 'grid' ? 'list' : 'grid';
+  const btn = document.getElementById('invViewBtn');
+  if(btn) btn.textContent = _invView === 'grid' ? '⊞' : '☰';
+  renderInv();
+}
+
+// Override renderInv to support list view
+const _origRenderInv = renderInv;
+renderInv = function(){
+  if(_invView === 'list') return renderInvList();
+  return _origRenderInv();
+};
+
+function renderInvList(){
+  const q=($('invSearch').value||'').toLowerCase(),cat=$('invCat').value||'';
+  const cats=[...new Set(S.products.map(p=>p.cat).filter(Boolean))];
+  const cs=$('invCat');if(cs.children.length<=1)cs.innerHTML='<option value="">Todas</option>'+cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  let prods=S.products.filter(p=>(!q||p.name.toLowerCase().includes(q)||(p.code||'').includes(q))&&(!cat||p.cat===cat)&&(!S.invLow||p.stock<=p.minStock));
+  if(S.invSortAsc!==null)prods.sort((a,b)=>S.invSortAsc?a.price-b.price:b.price-a.price);
+  $('invCount').textContent=prods.length+' productos';
+  const g=$('invGrid');
+  if(!prods.length){g.innerHTML='<div class="empty-state" style="grid-column:span 2"><div class="icon">📦</div><p>Sin productos</p></div>';return;}
+  g.style.display='block';
+  g.innerHTML=`<div style="display:flex;flex-direction:column;gap:1px;background:var(--border)">` +
+  prods.map(p=>{
+    const sc=p.stock===0?'sout':p.stock<=p.minStock?'slow':'sok';
+    const sl=p.stock===0?'❌ Agotado':p.stock<=p.minStock?'⚠ '+p.stock:'✓ '+p.stock;
+    return`<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg2);transition:background 0.15s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='var(--bg2)'">
+      <div style="width:40px;height:40px;border-radius:var(--r);background:var(--bg3);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:20px">
+        ${p.img?`<img src="${esc(p.img)}" style="width:100%;height:100%;object-fit:cover" loading="lazy">`:'📦'}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</div>
+        <div style="font-size:11px;color:var(--text2)">${esc(p.cat||'—')} · ${esc(p.code||'—')}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;margin-right:8px">
+        <div style="font-weight:700;font-family:var(--mono)">${fmt(p.price)}</div>
+        <div class="inv-stk ${sc}" style="font-size:11px">${sl}</div>
+      </div>
+      <div style="display:flex;gap:4px;flex-shrink:0">
+        <button class="btn btn-outline btn-sm" data-id="${p.id}" data-a="edit">✏️</button>
+        <button class="btn btn-outline btn-sm" data-id="${p.id}" data-a="dup">⧉</button>
+        <button class="btn btn-danger btn-sm" data-id="${p.id}" data-n="${esc(p.name)}" data-a="del">🗑</button>
+      </div>
+    </div>`;
+  }).join('') + `</div>`;
+}
+
+// Category manager
+function showCatManager(){
+  const cats=[...new Set(S.products.map(p=>p.cat).filter(Boolean))].sort();
+  openModal('🏷 Categorías',`
+    <div style="margin-bottom:12px;font-size:13px;color:var(--text2)">
+      Edita las categorías directamente en cada producto. Las categorías se crean automáticamente al guardar.
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+      ${cats.map(c=>`<div style="display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);padding:6px 10px">
+        <span style="font-size:13px">${esc(c)}</span>
+        <button onclick="renameCat('${esc(c)}')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px;padding:0 2px" title="Renombrar">✏️</button>
+      </div>`).join('')}
+    </div>
+    <div style="background:var(--surface);border-radius:var(--r);padding:12px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--text2)">Renombrar categoría</div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="catFrom" placeholder="Categoría actual" style="flex:1;padding:7px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px">
+        <span style="line-height:32px;color:var(--text3)">→</span>
+        <input type="text" id="catTo" placeholder="Nuevo nombre" style="flex:1;padding:7px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px">
+      </div>
+    </div>`,
+  `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>
+   <button class="btn btn-primary" onclick="applyRenamecat()">Renombrar</button>`);
+}
+
+function renameCat(name){
+  const f=document.getElementById('catFrom');
+  const t=document.getElementById('catTo');
+  if(f)f.value=name;
+  if(t){t.value=name;t.focus();t.select();}
+}
+
+async function applyRenamecat(){
+  const from=$('catFrom').value.trim();
+  const to=$('catTo').value.trim();
+  if(!from||!to){toast('Completa ambos campos','warn');return;}
+  if(from===to){toast('Son iguales','warn');return;}
+  const toUpdate=S.products.filter(p=>p.cat===from);
+  if(!toUpdate.length){toast('Sin productos con esa categoría','warn');return;}
+  showLoad();
+  let ok=0;
+  for(const p of toUpdate){
+    const r=await sb(`/rest/v1/productos?id=eq.${p.id}`,{method:'PATCH',body:JSON.stringify({categoria:to})});
+    if(r.ok)ok++;
+  }
+  hideLoad();
+  toast(`✓ ${ok} productos actualizados a "${to}"`, 'success');
+  await loadProds();
+  renderInv();
+  closeModal();
+}
+
+// FIX 7: Variant stock = product stock tracking
+// When adding product with variant selected, use variant's stock
+// Update addToCartWithVariant to check variant stock
+const _origAddToCartWithVariant = addToCartWithVariant;
+addToCartWithVariant = function(p, varLabel){
+  // Find the variant's stock if available
+  let varStock = -1;
+  if(varLabel && p.variants){
+    try{
+      const vars = typeof p.variants==='string' ? JSON.parse(p.variants) : p.variants;
+      // varLabel is "GroupName: Value" or "Value1 / Value2"
+      const parts = varLabel.split(' / ');
+      for(const g of vars){
+        const selVal = parts.find(part => g.values.some(v=>(v.name||v)===part));
+        if(selVal){
+          const v = g.values.find(v=>(v.name||v)===selVal);
+          if(v && v.stock != null) varStock = parseInt(v.stock);
+        }
+      }
+    }catch{}
+  }
+  if(varStock === 0){toast('Sin stock para esta variante','warn');return;}
+  _origAddToCartWithVariant(p, varLabel);
+};
 
 
 // Globals for inline onclick
