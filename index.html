@@ -1872,6 +1872,9 @@ function applyBranding(){
 function setDesktop(on){
   document.body.classList.toggle('desktop',on);
   localStorage.setItem('ox_desktop',on?'1':'0');
+  // Show search button only on desktop
+  const sb=document.getElementById('globalSearchBtn');
+  if(sb)sb.style.display=on?'flex':'none';
   updateSlider(on);
 }
 function updateSlider(on){
@@ -1945,9 +1948,7 @@ function renderProdGrid(q=''){
   const lq=(q||'').toLowerCase();
   const activeCat=document.querySelector('#salesCats .fpill.active');
   const cat=activeCat?activeCat.dataset.cat||'':'';
-  const posFilterCat=S.posFilterCat||'';
-  const filterCat=cat||posFilterCat;
-  let prods=S.products.filter(p=>(!lq||p.name.toLowerCase().includes(lq)||(p.code||'').includes(lq))&&(!filterCat||p.cat===filterCat));
+  let prods=S.products.filter(p=>(!lq||p.name.toLowerCase().includes(lq)||(p.code||'').includes(lq))&&(!cat||p.cat===cat));
   const cats=[...new Set(S.products.map(p=>p.cat).filter(Boolean))];
   const catsEl=$('salesCats');
   if(!catsEl.querySelector('.fpill')){
@@ -4497,7 +4498,8 @@ function openGlobalSearch(){
 
   const overlay=document.createElement('div');
   overlay.id='globalSearchOverlay';
-  overlay.style.cssText='position:fixed;inset:0;z-index:500;display:flex;flex-direction:column;align-items:center;padding-top:80px;background:oklch(10% 0.012 265 / 0.8);backdrop-filter:blur(8px)';
+  overlay.style.cssText='position:fixed;inset:0;z-index:9990;display:flex;flex-direction:column;align-items:center;padding-top:80px;background:oklch(10% 0.012 265 / 0.8);backdrop-filter:blur(8px)';
+  document.body.style.overflow='hidden';
 
   overlay.innerHTML=`
     <div style="width:100%;max-width:580px;background:var(--bg2);border:1.5px solid var(--border2);border-radius:var(--r3);box-shadow:0 24px 60px rgba(0,0,0,0.6);overflow:hidden;animation:fadeUp 0.2s ease">
@@ -4544,7 +4546,12 @@ function openGlobalSearch(){
 
 function closeGlobalSearch(){
   const el=document.getElementById('globalSearchOverlay');
-  if(el)el.remove();
+  if(el){
+    el.remove();
+    document.body.style.overflow='';
+  }
+  // Also clean up any leaked search inputs
+  document.querySelectorAll('#globalSearchOverlay').forEach(e=>e.remove());
 }
 
 function runGlobalSearch(q){
@@ -4657,25 +4664,7 @@ function initKeyboardShortcuts(){
 }
 
 function injectShortcutHints(){
-  // Add subtle keyboard hints to POS
-  const salesSec=document.getElementById('sec-sales');
-  if(!salesSec||document.getElementById('kbdHints'))return;
-
-  const hints=document.createElement('div');
-  hints.id='kbdHints';
-  hints.style.cssText='display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;';
-  hints.innerHTML=[
-    ['Ctrl+K','Búsqueda global'],
-    ['F2','Buscar producto'],
-    ['F4','Cobrar'],
-    ['⇧+Del','Vaciar carrito'],
-    ['1-5','Cambiar sección'],
-  ].map(([k,d])=>`<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3)">
-    <kbd style="background:var(--surface);border:1px solid var(--border2);border-radius:4px;padding:1px 6px;font-size:10px;font-family:var(--mono)">${k}</kbd>
-    <span>${d}</span>
-  </div>`).join('');
-
-  salesSec.insertBefore(hints,salesSec.querySelector('.sec-hd').nextSibling);
+  // Removed - keyboard hints were blocking mobile navigation
 }
 
 // ── Quick filter in POS ──────────────────────────────────────────────────
