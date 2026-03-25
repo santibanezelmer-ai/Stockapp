@@ -2245,6 +2245,10 @@ function showProdForm(p=null){
   let existingVars=[];
   if(p?.variants){try{existingVars=typeof p.variants==='string'?JSON.parse(p.variants):p.variants;}catch{}}
   const varRowsHTML=existingVars.map((g,i)=>buildVarRowHTML(g,i)).join('');
+  // Build gallery from existing product
+  let existingGallery=[];
+  if(p?.gallery&&Array.isArray(p.gallery))existingGallery=[...p.gallery];
+  else if(p?.img)existingGallery=[p.img];
 
   openModal(p?'Editar Producto':'Nuevo Producto',`
     <div class="form-group"><label>Nombre *</label><input type="text" id="pN" value="${esc(p?.name||'')}"></div>
@@ -2265,18 +2269,15 @@ function showProdForm(p=null){
       <div class="form-group"><label>Cantidad mínima</label><input type="number" id="pMq" value="${p?.minQty||1}" min="0.01" step="0.01"></div>
     </div>
     <div class="form-group"><label>Código de barras</label><input type="text" id="pBc" value="${esc(p?.code||'')}"></div>
-  <label>Imagen</label>
-      <div style="display:flex;gap:8px;align-items:flex-start">
-        <div id="pImgPreview" style="width:60px;height:60px;border-radius:var(--r);background:var(--bg2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;overflow:hidden">${p?.img?'<img src="'+esc(p.img)+'" style="width:100%;height:100%;object-fit:cover">':'📦'}</div>
-        <div style="flex:1;display:flex;flex-direction:column;gap:6px">
-          <input type="url" id="pIm" value="${esc(p?.img||'')}" placeholder="https://... o pega URL" oninput="previewProdImg(this.value)" style="width:100%;padding:9px 11px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
-          <div style="display:flex;gap:6px">
-            <button type="button" class="btn btn-ghost btn-sm" style="flex:1" onclick="document.getElementById('pImgFile').click()">📁 Subir</button>
-            <button type="button" class="btn btn-danger btn-sm" onclick="document.getElementById('pIm').value='';document.getElementById('pImgPreview').innerHTML='📦'">✕</button>
-          </div>
-          <input type="file" id="pImgFile" accept="image/*" style="display:none">
-        </div>
-      </div>>
+  <label>Fotos del producto</label>
+      <div id="pGallery" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;min-height:72px"></div>
+      <input type="hidden" id="pIm" value="${esc(p?.img||'')}">
+      <input type="hidden" id="pGalleryData" value="${esc(JSON.stringify(existingGallery))}">
+      <div style="display:flex;gap:6px;margin-bottom:4px">
+        <input type="url" id="pImgUrl" placeholder="Pegar URL de imagen..." style="flex:1;padding:7px 10px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:12px;outline:none">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="addImgFromUrl()">+ URL</button>
+      </div>
+      <input type="file" id="pImgFile" accept="image/*" multiple style="display:none">
     <div class="form-group"><label>Notas / Descripción</label><textarea id="pNo" rows="2">${esc(p?.notes||'')}</textarea></div>
     <!-- VARIANTES -->
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px;margin-top:4px">
@@ -3533,8 +3534,10 @@ const _mObs=new MutationObserver(()=>{
       if(gd){
         try{const imgs=JSON.parse(gd.value||'[]');initGallery(imgs);}
         catch{initGallery([]);}
+      } else {
+        initGallery([]);
       }
-    },50);
+    },80);
   }
 });
 _mObs.observe(document.body,{childList:true,subtree:true});
@@ -5459,6 +5462,7 @@ function renderInvList(){
 
 // Category manager
 function showCatManager(){
+  if(!S.products.length){toast('Carga el inventario primero','warn');showSec('inventory');return;}
   const cats=[...new Set(S.products.map(p=>p.cat).filter(Boolean))].sort();
   openModal('🏷 Categorías',`
     <div style="margin-bottom:12px;font-size:13px;color:var(--text2)">
