@@ -1864,23 +1864,10 @@ async function startApp(){
   const base='operixerp.cloud';
   const isApex=host===base||host==='www.'+base;
 
-  // If on apex domain, redirect to slug subdomain
-  if(isApex&&S.user?.nid&&!S._skipApexRedirect){
-    try{
-      const res=await fetch(SB+'/rest/v1/negocios?id=eq.'+S.user.nid+'&select=slug',{
-        headers:{apikey:SK,Authorization:'Bearer '+SK}
-      });
-      const data=await res.json();
-      const slug=data&&data[0]&&(data[0].slug||'').trim();
-      if(slug){
-        // Store session with a short-lived token key in localStorage
-        const tok=Math.random().toString(36).slice(2)+Date.now().toString(36);
-        localStorage.setItem('oxtoken_'+tok,JSON.stringify(S.user));
-        // Redirect to subdomain passing token in URL
-        window.location.href='https://'+slug+'.'+base+'?oxtoken='+tok;
-        return;
-      }
-    }catch(e){console.warn('Slug redirect:',e);}
+  // Apex domain: never auto-start app, redirect is handled by doLogin()
+  if(isApex&&!S._skipApexRedirect){
+    // Show login screen, don't start app on apex
+    return;
   }
 
   // Normal app start
@@ -3106,8 +3093,23 @@ document.addEventListener('DOMContentLoaded',async ()=>{
       }
     }catch(e){}
   }
+  // Only restore session if on correct subdomain
   const saved=sessionStorage.getItem('ox_user');
-  if(saved){try{S.user=JSON.parse(saved);startApp();}catch{sessionStorage.removeItem('ox_user');}}
+  if(saved){
+    try{
+      const u=JSON.parse(saved);
+      // Verify we're on a subdomain (not apex) before auto-restoring
+      const h=window.location.hostname;
+      const base='operixerp.cloud';
+      const isApex=h===base||h==='www.'+base;
+      // On apex: never auto-restore (user must login explicitly)
+      // On subdomain: restore only if session belongs to this negocio
+      if(!isApex){
+        S.user=u;
+        startApp();
+      }
+    }catch{sessionStorage.removeItem('ox_user');}
+  }
   } // end else (not /login)
 });
 
@@ -3697,7 +3699,7 @@ async function verifyOTP(){
     S.user={id:u.id,name:u.nombre,login:u.login,role:u.rol,nid:u.negocio_id,perms:u.permisos||{},bizName:neg?neg.nombre:''};
     sessionStorage.setItem('ox_user',JSON.stringify(S.user));
     hideLoad();
-    startApp();
+    await redirectToSubdomain(S.user);
   }catch(e){showAErr('loginErr','Error: '+e.message);hideLoad();}
 }
 
@@ -5177,6 +5179,41 @@ function applyTheme(theme){
     document.documentElement.style.removeProperty('--text2');
     document.documentElement.style.removeProperty('--text3');
   }
+}
+
+
+// ═══════════════════════════════════════════════════
+// SUBDOMAIN REDIRECT (called after successful login)
+// ═══════════════════════════════════════════════════
+async function redirectToSubdomain(user){
+  const base='operixerp.cloud';
+  const host=window.location.hostname;
+  const isApex=host===base||host==='www.'+base;
+
+  // Already on a subdomain - just start app normally
+  if(!isApex){
+    startApp();
+    return;
+  }
+
+  // On apex - find slug and redirect
+  try{
+    const res=await fetch(SB+'/rest/v1/negocios?id=eq.'+user.nid+'&select=slug',{
+      headers:{apikey:SK,Authorization:'Bearer '+SK}
+    });
+    const data=await res.json();
+    const slug=data&&data[0]&&(data[0].slug||'').trim();
+    if(slug){
+      // Pass session via token
+      const tok=Math.random().toString(36).slice(2)+Date.now().toString(36);
+      localStorage.setItem('oxtoken_'+tok,JSON.stringify(user));
+      window.location.href='https://'+slug+'.'+base+'?oxtoken='+tok;
+      return;
+    }
+  }catch(e){console.warn('Redirect error:',e);}
+
+  // No slug found - start app on apex as fallback
+  startApp();
 }
 
 
