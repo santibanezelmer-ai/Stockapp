@@ -1182,29 +1182,67 @@ body.app-active footer.site-footer{
         <div class="sec-hd"><h2>Ventas</h2></div>
         <div class="search-bar"><input type="text" id="salesSearch" placeholder="Buscar producto..."></div>
         <div class="filters" id="salesCats"></div>
-        <div class="prod-grid" id="prodGrid"></div>
-        <div style="margin-top:14px">
-          <div style="font-size:13px;font-weight:700;margin-bottom:8px">🛒 Carrito</div>
-          <div class="cart-box">
-            <div id="cartItems"><div class="cart-empty">Sin productos</div></div>
-            <div id="cartSummary" class="hidden">
-              <div class="cart-total-row"><span class="cart-total-label">Total</span><span class="cart-total-val" id="cartTotal">$0</span></div>
+
+        <!-- POS: grid izq + carrito der -->
+        <div id="posLayout" style="display:grid;grid-template-columns:1fr 300px;gap:14px;align-items:start;margin-top:4px">
+
+          <!-- Productos -->
+          <div class="prod-grid" id="prodGrid"></div>
+
+          <!-- Carrito fijo -->
+          <div style="position:sticky;top:4px;background:var(--bg2);border:1.5px solid var(--border2);border-radius:var(--r3);overflow:hidden">
+
+            <!-- Header carrito -->
+            <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+              <span style="font-weight:800;font-size:14px">🛒 Carrito</span>
+              <button onclick="S.cart=[];updateCart();renderProdGrid($('salesSearch').value||'')" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer">Vaciar</button>
             </div>
-          </div>
-          <div class="form-row" style="margin-bottom:10px">
-            <div class="form-group" style="margin:0"><label>Descuento %</label><input type="number" id="discInput" value="0" min="0" max="100"></div>
-            <div class="form-group" style="margin:0"><label>Cliente</label><select id="saleClient"><option value="">Sin cliente</option></select></div>
-          </div>
-          <div class="pay-grid" id="payGrid"></div>
-          <div id="cashRow">
-            <div class="form-group" style="margin-bottom:8px"><label>Efectivo recibido</label><input type="number" id="cashRec" placeholder="0"></div>
-            <div id="changeRow" class="hidden" style="background:var(--gbg);border-radius:var(--r);padding:10px 14px;margin-bottom:8px;font-weight:700;color:var(--green)"></div>
-          </div>
-          <div id="fiadoRow" class="hidden" style="margin-bottom:10px">
-            <div class="form-group" style="margin:0"><label>⚠ Cliente requerido para fiado</label><select id="fiadoClient"><option value="">Seleccionar...</option></select></div>
-          </div>
-          <button class="btn btn-primary btn-lg" id="checkoutBtn" disabled>💳 Cobrar</button>
-        </div>
+
+            <!-- Items -->
+            <div id="cartItems" style="min-height:60px;max-height:300px;overflow-y:auto">
+              <div style="padding:20px;text-align:center;color:var(--text3);font-size:12px">Sin productos</div>
+            </div>
+
+            <!-- Summary (siempre visible) -->
+            <div style="padding:12px 14px;border-top:1px solid var(--border)">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                <span style="font-size:13px;color:var(--text2);font-weight:600">Total</span>
+                <span id="cartTotal" style="font-size:22px;font-weight:800;color:var(--green);font-family:var(--mono)">$0</span>
+              </div>
+              <div id="cartSummary">
+                <!-- Descuento + Cliente -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+                  <div>
+                    <div style="font-size:10px;color:var(--text3);margin-bottom:2px">Descuento %</div>
+                    <input type="number" id="discInput" value="0" min="0" max="100" style="width:100%;padding:5px 7px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px">
+                  </div>
+                  <div>
+                    <div style="font-size:10px;color:var(--text3);margin-bottom:2px">Cliente</div>
+                    <select id="saleClient" style="width:100%;padding:5px 7px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:11px">
+                      <option value="">Sin cliente</option>
+                    </select>
+                  </div>
+                </div>
+                <!-- Métodos pago -->
+                <div class="pay-grid" id="payGrid" style="margin-bottom:8px"></div>
+                <!-- Efectivo -->
+                <div id="cashRow">
+                  <input type="number" id="cashRec" placeholder="Efectivo recibido" style="width:100%;padding:7px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px;margin-bottom:5px">
+                  <div id="changeRow" class="hidden" style="background:var(--gbg);border-radius:var(--r);padding:7px 10px;margin-bottom:6px;font-weight:700;color:var(--green);font-size:12px"></div>
+                </div>
+                <!-- Fiado -->
+                <div id="fiadoRow" class="hidden" style="margin-bottom:6px">
+                  <select id="fiadoClient" style="width:100%;padding:5px 7px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:11px">
+                    <option value="">⚠ Seleccionar cliente...</option>
+                  </select>
+                </div>
+              </div>
+              <!-- Cobrar -->
+              <button class="btn btn-primary btn-lg" id="checkoutBtn" disabled style="margin-top:4px">💳 Cobrar</button>
+            </div>
+
+          </div><!-- /carrito -->
+        </div><!-- /posLayout -->
       </section>
 
       <!-- INVENTORY -->
@@ -1976,6 +2014,9 @@ function renderProdGrid(q=''){
     const sl=p.stock===0?'❌ Agotado':p.stock<=p.minStock?'⚠ '+p.stock:'✓ '+p.stock;
     return`<div class="prod-card" data-pid="${p.id}">${ic?`<div class="prod-badge">${ic.qty}x</div>`:''}<div class="prod-img" ${p.gallery&&p.gallery.length>1?`onclick="event.stopPropagation();cycleProdImg(this,'${p.id}')"`:''}>${p.img?`<img src="${esc(p.img)}" loading="lazy">`:'📦'}${p.gallery&&p.gallery.length>1?`<div class="prod-img-dots">${p.gallery.slice(0,4).map((_,i)=>`<div class="prod-img-dot${i===0?' active':''}"></div>`).join('')}</div>`:''}</div><div class="prod-body"><div class="prod-name">${esc(p.name)}</div><div class="prod-price">${fmt(p.price)}</div>${p.unit!=='unidad'?`<div class="prod-unit">/${p.unit}</div>`:''}<div class="prod-stock ${sc}">${sl}</div></div>${p.unit!=='unidad'?`<button class="prod-add prod-add-unit" data-pid="${p.id}" data-unit="${p.unit}" data-price="${p.price}" title="Agregar cantidad">+</button>`:`<button class="prod-add" data-pid="${p.id}">+</button>`}</div>`;
   }).join('');
+  // Event delegation for + buttons
+  const gEl=document.getElementById('prodGrid');
+  if(gEl){gEl.onclick=e=>{const btn=e.target.closest('[data-pid]');if(!btn)return;const pid=btn.dataset.pid;if(btn.classList.contains('prod-add-unit')){showUnitQtyPicker(pid,btn.dataset.unit,parseFloat(btn.dataset.price));}else{addToCart(pid);};};}
 }
 
 function addToCart(pid){
@@ -1993,14 +2034,18 @@ function chQty(idx,delta){
 }
 
 function updateCart(){
-  const disc=parseFloat($('discInput').value)||0;
+  const disc=parseFloat($('discInput')?.value)||0;
   const sub=S.cart.reduce((s,i)=>s+i.price*i.qty,0);
   const total=sub*(1-disc/100);
-  const items=$('cartItems'),sum=$('cartSummary');
-  if(!S.cart.length){items.innerHTML='<div class="cart-empty">Sin productos</div>';sum.classList.add('hidden');$('checkoutBtn').disabled=true;return;}
+  const items=$('cartItems');
+  if(!S.cart.length){
+    items.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3);font-size:12px">Sin productos</div>';
+    $('checkoutBtn').disabled=true;
+    $('cartTotal').textContent='$0';
+    return;
+  }
   $('checkoutBtn').disabled=false;
-  items.innerHTML=S.cart.map((item,idx)=>`<div class="cart-item"><span class="ci-name">${esc(item.name)}</span><span class="ci-price">${fmt(item.price)}</span><div class="qty-ctrl"><button class="qty-btn" data-idx="${idx}" data-d="-1">−</button><span class="qty-val">${item.qty}</span><button class="qty-btn" data-idx="${idx}" data-d="1">+</button></div><button class="ci-del" data-idx="${idx}">🗑</button></div>`).join('');
-  sum.classList.remove('hidden');
+  items.innerHTML=S.cart.map((item,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--border)"><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">${esc(item.name)}</div><div style="font-size:11px;color:var(--text2)">${fmt(item.price)} c/u</div></div><div style="display:flex;align-items:center;gap:3px"><button class="qty-btn" data-idx="${i}" data-d="-1" style="width:22px;height:22px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center">−</button><span style="font-weight:800;font-size:13px;min-width:20px;text-align:center;font-family:var(--mono)">${item.qty}</span><button class="qty-btn" data-idx="${i}" data-d="1" style="width:22px;height:22px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center">+</button></div><span style="font-size:12px;font-weight:700;color:var(--green);min-width:54px;text-align:right;font-family:var(--mono)">${fmt(item.price*item.qty)}</span><button class="ci-del" data-idx="${i}" style="background:none;border:none;color:var(--text3);cursor:pointer;padding:2px 4px;font-size:13px">✕</button></div>`).join('');
   $('cartTotal').textContent=fmt(total);
   // Ensure cart is visible on mobile
   const cartBox=document.querySelector('.cart-box');
