@@ -1707,19 +1707,49 @@ async function sb(path,opts={}){
 async function doLogin(){
   const u=$('loginUser').value.trim(),p=$('loginPass').value.trim();
   if(!u||!p){showAErr('loginErr','Completa todos los campos');return;}
+
+  // Rate limiting
+  const lockKey='ox_lock_'+btoa(u).slice(0,12);
+  const lockData=JSON.parse(localStorage.getItem(lockKey)||'{"attempts":0,"lockedUntil":0}');
+  if(lockData.lockedUntil>Date.now()){
+    const mins=Math.ceil((lockData.lockedUntil-Date.now())/60000);
+    showAErr('loginErr','Cuenta bloqueada. Intenta en '+mins+' minuto(s).');return;
+  }
+
   showLoad();
   try{
-    const r=await sb(`/rest/v1/usuarios?login=eq.${encodeURIComponent(u)}&password=eq.${encodeURIComponent(p)}&activo=eq.true`);
-    if(!r.ok||!r.data.length){showAErr('loginErr','Credenciales incorrectas');return;}
+    const r=await _realSb(`/rest/v1/usuarios?login=eq.${encodeURIComponent(u)}&password=eq.${encodeURIComponent(p)}&activo=eq.true`);
+    if(!r.ok||!r.data.length){
+      lockData.attempts=(lockData.attempts||0)+1;
+      if(lockData.attempts>=5){lockData.lockedUntil=Date.now()+15*60*1000;lockData.attempts=0;}
+      localStorage.setItem(lockKey,JSON.stringify(lockData));
+      const rem=Math.max(0,5-lockData.attempts);
+      showAErr('loginErr','Credenciales incorrectas'+(rem>0?' · '+rem+' intentos restantes':''));
+      hideLoad();return;
+    }
+    localStorage.removeItem(lockKey);
     const usr=r.data[0];
-    const nr=await sb(`/rest/v1/negocios?id=eq.${usr.negocio_id}&select=nombre,plan`);
+    const nr=await _realSb(`/rest/v1/negocios?id=eq.${usr.negocio_id}&select=nombre,plan,slug`);
     const neg=nr.data&&nr.data[0];
-    if(neg&&neg.plan==='blocked'){showAErr('loginErr','Cuenta suspendida. Contacta soporte.');return;}
+    if(neg&&neg.plan==='blocked'){showAErr('loginErr','Cuenta suspendida. Contacta soporte.');hideLoad();return;}
     S.user={id:usr.id,name:usr.nombre,login:usr.login,role:usr.rol,nid:usr.negocio_id,perms:usr.permisos||{},bizName:neg?neg.nombre:''};
     sessionStorage.setItem('ox_user',JSON.stringify(S.user));
-    startApp();
-  }catch(e){showAErr('loginErr','Error de conexión');}
-  finally{hideLoad();}
+    setTimeout(()=>{try{registerSession();}catch(e){}},300);
+    hideLoad();
+
+    // Redirect to subdomain if slug exists, otherwise start app here
+    const slug=(neg?.slug||'').trim();
+    const host=window.location.hostname;
+    const base='operixerp.cloud';
+    const isApex=host===base||host==='www.'+base;
+    if(slug&&isApex){
+      const tok=Math.random().toString(36).slice(2)+Date.now().toString(36);
+      localStorage.setItem('oxtoken_'+tok,JSON.stringify(S.user));
+      window.location.href='https://'+slug+'.'+base+'?oxtoken='+tok;
+    } else {
+      startApp();
+    }
+  }catch(e){showAErr('loginErr','Error de conexión: '+e.message);hideLoad();}
 }
 
 // Pending registration data (stored while waiting for OTP)
