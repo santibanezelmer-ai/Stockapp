@@ -1210,6 +1210,7 @@ body.desktop #toasts{bottom:20px}
             <input type="file" id="importFile" accept=".csv" class="hidden">
             <button class="btn btn-primary btn-sm" id="addProdBtn">+ Producto</button>
           </div>
+          </div>
         </div>
         <div class="search-bar"><input type="text" id="invSearch" placeholder="Buscar..."></div>
         <div class="filters" style="margin-bottom:12px">
@@ -1222,7 +1223,12 @@ body.desktop #toasts{bottom:20px}
 
       <!-- CLIENTS -->
       <section class="section" id="sec-clients">
-        <div class="sec-hd"><h2>Clientes</h2><button class="btn btn-primary btn-sm" id="addClientBtn">+ Cliente</button></div>
+        <div class="sec-hd"><h2>Clientes</h2>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick="showClientsProModal()">🏆 Vista PRO</button>
+            <button class="btn btn-primary btn-sm" id="addClientBtn">+ Cliente</button>
+          </div>
+        </div>
         <div class="search-bar"><input type="text" id="clientSearch" placeholder="Buscar..."></div>
         <div id="clientsList"></div>
       </section>
@@ -1920,6 +1926,9 @@ async function loadDash(){
   // Chart
   const days=[];
   for(let i=6;i>=0;i--){const d=new Date(Date.now()-i*86400000);const ds=d.toISOString().slice(0,10);const lbl=d.toLocaleDateString('es-CL',{weekday:'short',day:'numeric'});const tot=(wR.data||[]).filter(v=>v.created_at.slice(0,10)===ds).reduce((s,v)=>s+parseFloat(v.total||0),0);days.push({lbl,tot});}
+  // FASE 3: Load smart widgets
+  loadSmartDash();
+
   if(S.charts.dash)S.charts.dash.destroy();
   const ctx=$('dashChart');
   if(ctx&&window.Chart)S.charts.dash=new Chart(ctx,{type:'bar',data:{labels:days.map(d=>d.lbl),datasets:[{data:days.map(d=>d.tot),backgroundColor:'rgba(91,110,245,0.6)',borderRadius:4,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{callback:v=>fmt(v)},grid:{color:'rgba(255,255,255,0.04)'}},x:{grid:{display:false}}}}});
@@ -4138,6 +4147,312 @@ function addAuditToSettings(){
       <div style="font-size:13px;color:var(--text2)">Última sesión registrada en este dispositivo.</div>
     </div>`;
   auditSection.insertAdjacentHTML('beforeend',auditHTML);
+}
+
+
+// ═══════════════════════════════════════════════════
+// FASE 3 — DASHBOARD INTELIGENTE
+// ═══════════════════════════════════════════════════
+
+async function loadSmartDash(){
+  if(!S.user)return;
+  const nid=S.user.nid;
+  const today=new Date().toISOString().slice(0,10);
+  const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
+
+  const [todayR,yestR,debtR,lowR,topR]=await Promise.all([
+    sb(`/rest/v1/ventas?negocio_id=eq.${nid}&created_at=gte.${today}T00:00:00&estado=neq.anulada&select=total,created_at,pago`),
+    sb(`/rest/v1/ventas?negocio_id=eq.${nid}&created_at=gte.${yesterday}T00:00:00&created_at=lt.${today}T00:00:00&estado=neq.anulada&select=total`),
+    sb(`/rest/v1/clientes?negocio_id=eq.${nid}&deuda_total=gt.0&select=nombre,deuda_total&order=deuda_total.desc&limit=5`),
+    sb(`/rest/v1/productos?negocio_id=eq.${nid}&activo=eq.true&select=nombre,stock,stock_min&order=stock.asc&limit=5`),
+    sb(`/rest/v1/detalle_ventas?select=producto_id,cantidad,productos(nombre)&order=cantidad.desc&limit=100`),
+  ]);
+
+  const todaySales=todayR.data||[];
+  const yestSales=yestR.data||[];
+  const todayRev=todaySales.reduce((s,v)=>s+parseFloat(v.total||0),0);
+  const yestRev=yestSales.reduce((s,v)=>s+parseFloat(v.total||0),0);
+  const pctChange=yestRev>0?Math.round((todayRev-yestRev)/yestRev*100):0;
+  const debtors=debtR.data||[];
+  const lowStock=(lowR.data||[]).filter(p=>parseInt(p.stock||0)<=parseInt(p.stock_min||5));
+
+  // Top product from detalle_ventas
+  const prodMap={};
+  (topR.data||[]).forEach(d=>{
+    const pid=d.producto_id;
+    if(!prodMap[pid])prodMap[pid]={name:d.productos?.nombre||'Producto',qty:0};
+    prodMap[pid].qty+=parseInt(d.cantidad||0);
+  });
+  const topProds=Object.values(prodMap).sort((a,b)=>b.qty-a.qty).slice(0,3);
+
+  // Render smart widgets
+  renderSmartWidgets({todayRev,yestRev,pctChange,todaySales,debtors,lowStock,topProds});
+}
+
+function renderSmartWidgets({todayRev,yestRev,pctChange,todaySales,debtors,lowStock,topProds}){
+  const container=document.getElementById('smartDashWidgets');
+  if(!container)return;
+
+  const arrow=pctChange>=0?'↑':'↓';
+  const color=pctChange>=0?'var(--green)':'var(--red)';
+  const avgTicket=todaySales.length>0?Math.round(todayRev/todaySales.length):0;
+
+  // Pay method breakdown
+  const payBreak={};
+  todaySales.forEach(v=>{payBreak[v.pago]=(payBreak[v.pago]||0)+parseFloat(v.total||0);});
+
+  container.innerHTML=`
+    <!-- Hoy vs Ayer -->
+    <div class="card">
+      <div class="card-title">📈 Hoy vs Ayer</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div style="background:var(--surface);border-radius:var(--r);padding:12px">
+          <div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Hoy</div>
+          <div style="font-family:var(--mono);font-size:20px;font-weight:800;color:var(--green)">${fmt(todayRev)}</div>
+          <div style="font-size:11px;color:${color};margin-top:3px;font-weight:700">${arrow} ${Math.abs(pctChange)}% vs ayer</div>
+        </div>
+        <div style="background:var(--surface);border-radius:var(--r);padding:12px">
+          <div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Ayer</div>
+          <div style="font-family:var(--mono);font-size:20px;font-weight:800;color:var(--text2)">${fmt(yestRev)}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px">${todaySales.length} ventas hoy</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px;background:var(--surface);border-radius:var(--r);font-size:12px">
+        <span style="color:var(--text2)">Ticket promedio</span>
+        <span style="font-family:var(--mono);font-weight:700;color:var(--accent2)">${fmt(avgTicket)}</span>
+      </div>
+      ${Object.entries(payBreak).length?`
+      <div style="margin-top:10px">
+        ${Object.entries(payBreak).map(([m,v])=>`
+          <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border)">
+            <span style="color:var(--text2)">${m}</span>
+            <span style="font-family:var(--mono);font-weight:700">${fmt(v)}</span>
+          </div>`).join('')}
+      </div>`:''}
+    </div>
+
+    <!-- Top productos -->
+    <div class="card">
+      <div class="card-title">🏆 Más vendidos</div>
+      ${topProds.length?topProds.map((p,i)=>`
+        <div class="data-item">
+          <div class="d-icon" style="background:var(--accent-glow);font-family:var(--mono);font-weight:800;font-size:13px;color:var(--accent2)">#${i+1}</div>
+          <div class="d-info"><div class="d-title">${esc(p.name)}</div><div class="d-sub">${p.qty} unidades vendidas</div></div>
+        </div>`).join(''):'<div class="empty-state" style="padding:16px"><p style="font-size:12px">Sin datos de ventas aún</p></div>'}
+    </div>
+
+    <!-- Clientes con deuda -->
+    <div class="card">
+      <div class="card-title">⚠️ Cobros pendientes</div>
+      ${debtors.length?debtors.map(d=>`
+        <div class="data-item">
+          <div class="d-icon" style="background:var(--red-bg);color:var(--red);font-weight:800;font-size:14px">${(d.nombre||'?').charAt(0).toUpperCase()}</div>
+          <div class="d-info"><div class="d-title">${esc(d.nombre)}</div></div>
+          <div class="d-amount red">${fmt(d.deuda_total)}</div>
+        </div>`).join(''):'<div style="text-align:center;color:var(--green);padding:16px;font-size:13px">✓ Sin deudas pendientes</div>'}
+    </div>
+
+    <!-- Stock bajo -->
+    <div class="card">
+      <div class="card-title">📦 Stock crítico</div>
+      ${lowStock.length?lowStock.map(p=>`
+        <div class="data-item">
+          <div class="d-icon" style="background:var(--yel-bg)">${parseInt(p.stock)===0?'🔴':'🟡'}</div>
+          <div class="d-info">
+            <div class="d-title">${esc(p.nombre)}</div>
+            <div class="d-sub">Mínimo: ${p.stock_min} uds</div>
+          </div>
+          <div style="font-family:var(--mono);font-weight:800;color:${parseInt(p.stock)===0?'var(--red)':'var(--yellow)'}">
+            ${p.stock} uds
+          </div>
+        </div>`).join(''):'<div style="text-align:center;color:var(--green);padding:16px;font-size:13px">✓ Stock en orden</div>'}
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+// FASE 3 — CLIENTES PRO
+// ═══════════════════════════════════════════════════
+
+async function loadClientsPro(){
+  if(!S.user)return;
+  const nid=S.user.nid;
+  const [clientsR,salesR]=await Promise.all([
+    sb(`/rest/v1/clientes?negocio_id=eq.${nid}&activo=eq.true&order=deuda_total.desc`),
+    sb(`/rest/v1/ventas?negocio_id=eq.${nid}&estado=neq.anulada&select=cliente_id,total,created_at&order=created_at.desc`)
+  ]);
+  const clients=clientsR.data||[];
+  const sales=salesR.data||[];
+
+  // Enrich clients with purchase stats
+  const enriched=clients.map(c=>{
+    const cSales=sales.filter(s=>s.cliente_id===c.id);
+    const total=cSales.reduce((s,v)=>s+parseFloat(v.total||0),0);
+    const lastBuy=cSales[0]?.created_at;
+    const daysSince=lastBuy?Math.floor((Date.now()-new Date(lastBuy))/86400000):null;
+    const freq=cSales.length>1?Math.round((new Date(cSales[0].created_at)-new Date(cSales[cSales.length-1].created_at))/(cSales.length-1)/86400000):null;
+    return{...c,purchases:cSales.length,totalSpent:total,lastBuy,daysSince,avgFreq:freq};
+  }).sort((a,b)=>b.totalSpent-a.totalSpent);
+
+  S.clientsPro=enriched;
+  renderClientsPro(enriched);
+}
+
+function renderClientsPro(clients){
+  const el=document.getElementById('clientsProList');
+  if(!el)return;
+  if(!clients.length){el.innerHTML='<div class="empty-state"><div class="icon">👥</div><p>Sin clientes aún</p></div>';return;}
+
+  el.innerHTML=clients.map((c,i)=>{
+    const tier=c.totalSpent>100000?'🥇':c.totalSpent>50000?'🥈':c.totalSpent>20000?'🥉':'';
+    const riskColor=c.daysSince>60?'var(--red)':c.daysSince>30?'var(--yellow)':'var(--green)';
+    const riskLabel=c.daysSince===null?'Nuevo':c.daysSince>60?'En riesgo':c.daysSince>30?'Inactivo':'Activo';
+    return`<div class="data-item" style="cursor:pointer" onclick="showClientPro('${c.id}')">
+      <div class="cl-av" style="background:linear-gradient(135deg,var(--accent),oklch(57% 0.22 295));color:white;font-weight:800;font-size:14px;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">${(c.nombre||'?').charAt(0).toUpperCase()}</div>
+      <div class="d-info">
+        <div class="d-title">${tier} ${esc(c.nombre)} ${c.deuda_total>0?`<span class="badge badge-red" style="font-size:9px">Deuda ${fmt(c.deuda_total)}</span>`:''}</div>
+        <div class="d-sub">${c.purchases} compras · ${fmt(c.totalSpent)} total${c.avgFreq?` · cada ${c.avgFreq}d`:''}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:11px;font-weight:700;color:${riskColor}">${riskLabel}</div>
+        ${c.daysSince!==null?`<div style="font-size:10px;color:var(--text3)">hace ${c.daysSince}d</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function showClientPro(cid){
+  const c=S.clientsPro?.find(c=>c.id===cid);
+  if(!c)return;
+  showLoad();
+  const r=await sb(`/rest/v1/ventas?cliente_id=eq.${cid}&estado=neq.anulada&order=created_at.desc&limit=20&select=total,created_at,pago`);
+  hideLoad();
+  const sales=r.data||[];
+  const tier=c.totalSpent>100000?'🥇 VIP':c.totalSpent>50000?'🥈 Frecuente':c.totalSpent>20000?'🥉 Regular':'Cliente';
+  openModal('👤 '+esc(c.nombre),`
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+      <div style="background:var(--surface);border-radius:var(--r);padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">TOTAL GASTADO</div>
+        <div style="font-family:var(--mono);font-weight:800;color:var(--green);font-size:15px">${fmt(c.totalSpent)}</div>
+      </div>
+      <div style="background:var(--surface);border-radius:var(--r);padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">COMPRAS</div>
+        <div style="font-family:var(--mono);font-weight:800;font-size:15px">${c.purchases}</div>
+      </div>
+      <div style="background:var(--surface);border-radius:var(--r);padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">NIVEL</div>
+        <div style="font-size:13px;font-weight:700">${tier}</div>
+      </div>
+    </div>
+    ${c.deuda_total>0?`<div style="background:var(--red-bg);border:1px solid var(--red-border);border-radius:var(--r);padding:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center"><span style="color:var(--red);font-weight:700">Deuda pendiente</span><span style="font-family:var(--mono);font-weight:800;color:var(--red)">${fmt(c.deuda_total)}</span></div>`:''}
+    <div style="font-weight:700;font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Últimas compras</div>
+    <div class="data-list">
+      ${sales.length?sales.map(s=>`
+        <div class="data-item">
+          <div class="d-icon" style="background:var(--gbg)">💳</div>
+          <div class="d-info"><div class="d-title">${esc(s.pago||'Efectivo')}</div><div class="d-sub">${fmtDT(s.created_at)}</div></div>
+          <div class="d-amount green">${fmt(s.total)}</div>
+        </div>`).join(''):'<div style="color:var(--text3);font-size:13px;padding:8px">Sin compras registradas</div>'}
+    </div>`
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// FASE 3 — STOCK INTELIGENTE
+// ═══════════════════════════════════════════════════
+
+async function loadSmartStock(){
+  if(!S.user)return;
+  const [prodsR,salesR]=await Promise.all([
+    sb(`/rest/v1/productos?negocio_id=eq.${S.user.nid}&activo=eq.true&select=id,nombre,stock,stock_min,precio_costo,precio_venta`),
+    sb(`/rest/v1/detalle_ventas?select=producto_id,cantidad&order=created_at.desc`)
+  ]);
+
+  const prods=prodsR.data||[];
+  const sales=salesR.data||[];
+
+  // Calculate avg daily sales per product (last 30 days)
+  const salesMap={};
+  sales.forEach(s=>{salesMap[s.producto_id]=(salesMap[s.producto_id]||0)+parseInt(s.cantidad||0);});
+
+  const enriched=prods.map(p=>{
+    const sold=salesMap[p.id]||0;
+    const avgDaily=Math.round(sold/30*10)/10;
+    const daysLeft=avgDaily>0?Math.floor(parseInt(p.stock||0)/avgDaily):null;
+    const reorderQty=Math.max(parseInt(p.stock_min||5)*3,Math.ceil(avgDaily*14));
+    const status=parseInt(p.stock)===0?'sin_stock':parseInt(p.stock)<=parseInt(p.stock_min||5)?'critico':daysLeft!==null&&daysLeft<7?'bajo':'ok';
+    return{...p,sold,avgDaily,daysLeft,reorderQty,status};
+  }).sort((a,b)=>{
+    const order={sin_stock:0,critico:1,bajo:2,ok:3};
+    return (order[a.status]||3)-(order[b.status]||3);
+  });
+
+  S.smartStock=enriched;
+  renderSmartStock(enriched);
+}
+
+function renderSmartStock(prods){
+  const el=document.getElementById('smartStockList');
+  if(!el)return;
+
+  const critical=prods.filter(p=>p.status!=='ok');
+  const ok=prods.filter(p=>p.status==='ok');
+
+  const statusBadge={
+    'sin_stock':'<span style="background:var(--red-bg);color:var(--red);border-radius:100px;padding:2px 8px;font-size:10px;font-weight:700">Sin stock</span>',
+    'critico':'<span style="background:var(--yel-bg);color:var(--yellow);border-radius:100px;padding:2px 8px;font-size:10px;font-weight:700">Crítico</span>',
+    'bajo':'<span style="background:var(--blue-bg);color:var(--blue);border-radius:100px;padding:2px 8px;font-size:10px;font-weight:700">Bajo</span>',
+    'ok':'<span style="background:var(--green-bg);color:var(--green);border-radius:100px;padding:2px 8px;font-size:10px;font-weight:700">OK</span>'
+  };
+
+  const renderRow=p=>`
+    <div class="data-item">
+      <div class="d-icon" style="background:${p.status==='sin_stock'?'var(--red-bg)':p.status==='critico'?'var(--yel-bg)':'var(--surface2)'}">
+        ${p.status==='sin_stock'?'🔴':p.status==='critico'?'🟡':p.status==='bajo'?'🔵':'✅'}
+      </div>
+      <div class="d-info">
+        <div class="d-title">${esc(p.nombre)} ${statusBadge[p.status]||''}</div>
+        <div class="d-sub">
+          Stock: <strong style="color:${p.stock<=0?'var(--red)':p.stock<=p.stock_min?'var(--yellow)':'var(--text)'}">${p.stock}</strong> uds
+          ${p.avgDaily>0?` · ${p.avgDaily}/día · `:''}
+          ${p.daysLeft!==null?`<span style="color:${p.daysLeft<3?'var(--red)':p.daysLeft<7?'var(--yellow)':'var(--text2)'}">${p.daysLeft}d restantes</span>`:''}
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        ${p.status!=='ok'?`<div style="font-size:11px;color:var(--text2)">Reponer: <strong>${p.reorderQty} uds</strong></div>`:''}
+        ${p.status!=='ok'&&p.precio_costo>0?`<div style="font-size:10px;color:var(--text3)">≈ ${fmt(p.reorderQty*p.precio_costo)}</div>`:''}
+      </div>
+    </div>`;
+
+  el.innerHTML=`
+    ${critical.length?`
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;padding:8px 0 4px">
+        ⚠️ Requieren atención (${critical.length})
+      </div>
+      ${critical.map(renderRow).join('')}
+    `:'<div style="color:var(--green);text-align:center;padding:12px;font-size:13px">✓ Todo el inventario en orden</div>'}
+    ${ok.length?`
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;padding:12px 0 4px;border-top:1px solid var(--border);margin-top:8px">
+        Stock OK (${ok.length})
+      </div>
+      ${ok.map(renderRow).join('')}
+    `:''}`;
+}
+
+
+function showSmartStock(){
+  openModal('🧠 Stock inteligente',
+    '<div id="smartStockList" class="data-list"><div style="text-align:center;padding:20px;color:var(--text3)">Cargando...</div></div>',
+    '<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>'
+  );
+  loadSmartStock();
+}
+
+function showClientsProModal(){
+  openModal('🏆 Clientes — Vista PRO',
+    '<div id="clientsProList" class="data-list"><div style="text-align:center;padding:20px;color:var(--text3)">Cargando...</div></div>',
+    '<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>'
+  );
+  loadClientsPro();
 }
 
 
