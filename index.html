@@ -1803,6 +1803,8 @@ async function startApp(){
   setDesktop(localStorage.getItem('ox_desktop')==='1');
   // Add audit section to settings
   setTimeout(addAuditToSettings, 500);
+  // FASE 4: keyboard shortcuts
+  initKeyboardShortcuts();
 }
 
 // NAV
@@ -1813,7 +1815,7 @@ function showSec(name){
   $$('.nav-btn[data-sec],.sid-btn[data-sec]').forEach(b=>b.classList.toggle('active',b.dataset.sec===name));
   $('appContent').scrollTop=0;
   $('moreOverlay').classList.add('hidden');
-  const loaders={dashboard:loadDash,sales:loadSalesSec,inventory:loadInv,clients:renderClients,purchases:loadPurchases,debts:loadDebts,payables:loadPayables,orders:loadOrders,devolutions:loadDevolutions,accounting:loadAcc,cashflow:loadCF,reports:()=>loadRep(S.repPeriod),settings:loadCfgUI,sucursales:loadSucursales};
+  const loaders={dashboard:loadDash,sales:()=>{loadSalesSec();setTimeout(initPOSQuickFilter,400);},inventory:loadInv,clients:renderClients,purchases:loadPurchases,debts:loadDebts,payables:loadPayables,orders:loadOrders,devolutions:loadDevolutions,accounting:loadAcc,cashflow:loadCF,reports:()=>loadRep(S.repPeriod),settings:loadCfgUI,sucursales:loadSucursales};
   if(loaders[name])loaders[name]();
 }
 
@@ -4453,6 +4455,226 @@ function showClientsProModal(){
     '<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>'
   );
   loadClientsPro();
+}
+
+
+// ═══════════════════════════════════════════════════
+// FASE 4 — ATAJOS DE TECLADO + BUSCADOR GLOBAL
+// ═══════════════════════════════════════════════════
+
+// ── Global search ────────────────────────────────────────────────────────
+function openGlobalSearch(){
+  const existing=document.getElementById('globalSearchOverlay');
+  if(existing){existing.remove();return;}
+
+  const overlay=document.createElement('div');
+  overlay.id='globalSearchOverlay';
+  overlay.style.cssText='position:fixed;inset:0;z-index:500;display:flex;flex-direction:column;align-items:center;padding-top:80px;background:oklch(10% 0.012 265 / 0.8);backdrop-filter:blur(8px)';
+
+  overlay.innerHTML=`
+    <div style="width:100%;max-width:580px;background:var(--bg2);border:1.5px solid var(--border2);border-radius:var(--r3);box-shadow:0 24px 60px rgba(0,0,0,0.6);overflow:hidden;animation:fadeUp 0.2s ease">
+      <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)">
+        <span style="font-size:16px;opacity:0.5">🔍</span>
+        <input id="globalSearchInput" type="text" placeholder="Buscar productos, clientes, ventas..." autocomplete="off"
+          style="flex:1;background:none;border:none;outline:none;font-size:15px;color:var(--text);font-family:var(--font)">
+        <kbd style="background:var(--surface);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px;color:var(--text3)">Esc</kbd>
+      </div>
+      <div id="globalSearchResults" style="max-height:380px;overflow-y:auto;padding:8px"></div>
+      <div style="padding:8px 16px;border-top:1px solid var(--border);display:flex;gap:16px;font-size:11px;color:var(--text3)">
+        <span>↵ Abrir</span><span>↑↓ Navegar</span><span>Esc Cerrar</span>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  const inp=document.getElementById('globalSearchInput');
+  inp.focus();
+
+  // Close on background click
+  overlay.addEventListener('click',e=>{if(e.target===overlay)closeGlobalSearch();});
+
+  // Search on input
+  let searchTimer;
+  inp.addEventListener('input',()=>{
+    clearTimeout(searchTimer);
+    searchTimer=setTimeout(()=>runGlobalSearch(inp.value.trim()),200);
+  });
+
+  // Keyboard navigation
+  inp.addEventListener('keydown',e=>{
+    const results=document.querySelectorAll('.gs-result');
+    const active=document.querySelector('.gs-result.gs-active');
+    const idx=active?[...results].indexOf(active):-1;
+    if(e.key==='Escape'){closeGlobalSearch();}
+    else if(e.key==='ArrowDown'){e.preventDefault();const next=results[idx+1]||results[0];results.forEach(r=>r.classList.remove('gs-active'));if(next)next.classList.add('gs-active');}
+    else if(e.key==='ArrowUp'){e.preventDefault();const prev=results[idx-1]||results[results.length-1];results.forEach(r=>r.classList.remove('gs-active'));if(prev)prev.classList.add('gs-active');}
+    else if(e.key==='Enter'){const a=document.querySelector('.gs-result.gs-active');if(a)a.click();}
+  });
+
+  // Show shortcuts by default
+  runGlobalSearch('');
+}
+
+function closeGlobalSearch(){
+  const el=document.getElementById('globalSearchOverlay');
+  if(el)el.remove();
+}
+
+function runGlobalSearch(q){
+  const el=document.getElementById('globalSearchResults');
+  if(!el)return;
+  const ql=q.toLowerCase();
+
+  const results=[];
+
+  // Quick actions (always show if no query)
+  if(!q){
+    results.push({type:'action',icon:'🛒',title:'Ir a Ventas',sub:'POS táctil',action:()=>{closeGlobalSearch();showSec('sales');}});
+    results.push({type:'action',icon:'📦',title:'Ir a Inventario',sub:'Gestión de productos',action:()=>{closeGlobalSearch();showSec('inventory');}});
+    results.push({type:'action',icon:'👥',title:'Ir a Clientes',sub:'Base de clientes',action:()=>{closeGlobalSearch();showSec('clients');}});
+    results.push({type:'action',icon:'📊',title:'Ir a Reportes',sub:'Análisis de ventas',action:()=>{closeGlobalSearch();showSec('reports');}});
+    results.push({type:'action',icon:'➕',title:'Nuevo producto',sub:'Agregar al inventario',action:()=>{closeGlobalSearch();showSec('inventory');setTimeout(()=>showProdForm(),300);}});
+    results.push({type:'action',icon:'👤',title:'Nuevo cliente',sub:'Registrar cliente',action:()=>{closeGlobalSearch();showSec('clients');setTimeout(()=>showClientForm(),300);}});
+  } else {
+    // Search products
+    (S.products||[]).filter(p=>p.name.toLowerCase().includes(ql)||p.code?.toLowerCase().includes(ql)||(p.cat||'').toLowerCase().includes(ql)).slice(0,5).forEach(p=>{
+      results.push({type:'producto',icon:'📦',title:p.name,sub:`${fmt(p.price)} · Stock: ${p.stock}`,action:()=>{closeGlobalSearch();showSec('sales');setTimeout(()=>{$('salesSearch').value=p.name;renderProdGrid(p.name);},300);}});
+    });
+    // Search clients
+    (S.clients||[]).filter(c=>c.name.toLowerCase().includes(ql)||(c.phone||'').includes(ql)).slice(0,4).forEach(c=>{
+      results.push({type:'cliente',icon:'👤',title:c.name,sub:c.phone||'Sin teléfono'+(c.debt>0?' · Deuda: '+fmt(c.debt):''),action:()=>{closeGlobalSearch();showSec('clients');setTimeout(()=>{$('clientSearch').value=c.name;renderClients(c.name);},300);}});
+    });
+    // Sections
+    const secs=[['ventas','🛒','sales'],['inventario','📦','inventory'],['clientes','👥','clients'],['reportes','📊','reports'],['configuración','⚙️','settings'],['compras','🏪','purchases'],['caja','💰','cashflow']];
+    secs.filter(([k])=>k.includes(ql)).slice(0,3).forEach(([k,icon,sec])=>{
+      results.push({type:'sección',icon,title:k.charAt(0).toUpperCase()+k.slice(1),sub:'Ir a la sección',action:()=>{closeGlobalSearch();showSec(sec);}});
+    });
+  }
+
+  if(!results.length){
+    el.innerHTML='<div style="text-align:center;padding:24px;color:var(--text3);font-size:13px">Sin resultados para "'+esc(q)+'"</div>';
+    return;
+  }
+
+  el.innerHTML=results.map((r,i)=>`
+    <div class="gs-result${i===0?' gs-active':''}"
+      style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r);cursor:pointer;transition:background 0.1s;margin-bottom:2px"
+      onmouseenter="document.querySelectorAll('.gs-result').forEach(x=>x.classList.remove('gs-active'));this.classList.add('gs-active')"
+      onclick="window._gsActions[${i}]()">
+      <div style="width:32px;height:32px;border-radius:var(--r);background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">${r.icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${esc(r.title)}</div>
+        <div style="font-size:11px;color:var(--text3)">${esc(r.sub||'')}</div>
+      </div>
+      <span style="font-size:10px;background:var(--surface);border-radius:100px;padding:2px 8px;color:var(--text3)">${r.type}</span>
+    </div>`).join('');
+
+  // Store actions
+  window._gsActions=results.map(r=>r.action);
+
+  // Add hover styles
+  document.querySelectorAll('.gs-result.gs-active').forEach(el=>{el.style.background='var(--surface)';});
+  const style=document.getElementById('gsStyle')||Object.assign(document.createElement('style'),{id:'gsStyle'});
+  style.textContent='.gs-result.gs-active{background:var(--surface)!important}.gs-result:hover{background:var(--surface)}';
+  document.head.appendChild(style);
+}
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+function initKeyboardShortcuts(){
+  document.addEventListener('keydown',e=>{
+    // Ignore if typing in an input
+    const tag=document.activeElement?.tagName;
+    const inInput=tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT';
+
+    // Ctrl+K or Cmd+K — Global search
+    if((e.ctrlKey||e.metaKey)&&e.key==='k'){
+      e.preventDefault();
+      if(S.user)openGlobalSearch();
+      return;
+    }
+
+    // Escape — close modals/search
+    if(e.key==='Escape'){
+      closeGlobalSearch();
+      if(!document.getElementById('modal')?.classList.contains('hidden'))closeModal();
+      return;
+    }
+
+    if(inInput||!S.user)return;
+
+    // Section shortcuts
+    if(e.key==='1'&&!e.ctrlKey){e.preventDefault();showSec('dashboard');}
+    else if(e.key==='2'&&!e.ctrlKey){e.preventDefault();showSec('sales');}
+    else if(e.key==='3'&&!e.ctrlKey){e.preventDefault();showSec('inventory');}
+    else if(e.key==='4'&&!e.ctrlKey){e.preventDefault();showSec('clients');}
+    else if(e.key==='5'&&!e.ctrlKey){e.preventDefault();showSec('reports');}
+
+    // POS shortcuts (only when in sales section)
+    if(S.sec==='sales'){
+      if(e.key==='F2'){e.preventDefault();$('salesSearch')?.focus();}
+      if(e.key==='F4'){e.preventDefault();doCheckout();}
+      if(e.key==='Delete'&&e.shiftKey){e.preventDefault();S.cart=[];updateCart();renderProdGrid('');}
+    }
+
+    // New item shortcuts
+    if((e.ctrlKey||e.metaKey)&&e.key==='n'){
+      e.preventDefault();
+      if(S.sec==='inventory')showProdForm();
+      else if(S.sec==='clients')showClientForm();
+      else if(S.sec==='purchases')showPurchForm();
+    }
+  });
+
+  // Show shortcut hint in POS
+  injectShortcutHints();
+}
+
+function injectShortcutHints(){
+  // Add subtle keyboard hints to POS
+  const salesSec=document.getElementById('sec-sales');
+  if(!salesSec||document.getElementById('kbdHints'))return;
+
+  const hints=document.createElement('div');
+  hints.id='kbdHints';
+  hints.style.cssText='display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;';
+  hints.innerHTML=[
+    ['Ctrl+K','Búsqueda global'],
+    ['F2','Buscar producto'],
+    ['F4','Cobrar'],
+    ['⇧+Del','Vaciar carrito'],
+    ['1-5','Cambiar sección'],
+  ].map(([k,d])=>`<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3)">
+    <kbd style="background:var(--surface);border:1px solid var(--border2);border-radius:4px;padding:1px 6px;font-size:10px;font-family:var(--mono)">${k}</kbd>
+    <span>${d}</span>
+  </div>`).join('');
+
+  salesSec.insertBefore(hints,salesSec.querySelector('.sec-hd').nextSibling);
+}
+
+// ── Quick filter in POS ──────────────────────────────────────────────────
+function initPOSQuickFilter(){
+  const salesSec=document.getElementById('sec-sales');
+  if(!salesSec||document.getElementById('posQuickFilter'))return;
+
+  // Add category quick filter pills
+  const filterWrap=document.createElement('div');
+  filterWrap.id='posQuickFilter';
+  filterWrap.className='filters';
+  filterWrap.style.marginBottom='10px';
+
+  const cats=['Todos',...new Set((S.products||[]).map(p=>p.cat).filter(Boolean))];
+  filterWrap.innerHTML=cats.map((c,i)=>
+    `<button class="fpill${i===0?' active':''}" onclick="filterPOSCat('${c==='Todos'?'':c}',this)">${c}</button>`
+  ).join('');
+
+  const searchBar=salesSec.querySelector('.search-bar');
+  if(searchBar)searchBar.insertAdjacentElement('afterend',filterWrap);
+}
+
+function filterPOSCat(cat,btn){
+  document.querySelectorAll('#posQuickFilter .fpill').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  S.posFilterCat=cat;
+  renderProdGrid($('salesSearch')?.value||'');
 }
 
 
