@@ -1732,6 +1732,7 @@ async function resendRegOTP(){
 }
 
 function doLogout(){
+  auditLog('logout',{user:S.user?.login||''});
   if(!confirm('¿Cerrar sesión?'))return;
   S.user=null;
   sessionStorage.removeItem('ox_user');
@@ -1794,6 +1795,8 @@ async function startApp(){
   await Promise.all([loadProds(),loadClients()]);
   showSec('dashboard');
   setDesktop(localStorage.getItem('ox_desktop')==='1');
+  // Add audit section to settings
+  setTimeout(addAuditToSettings, 500);
 }
 
 // NAV
@@ -2140,7 +2143,10 @@ async function saveProd(id){
 
 async function delProd(id,name){
   if(!confirm(`¿Eliminar "${name}"?`))return;
-  showLoad();await sb(`/rest/v1/productos?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({activo:false})});hideLoad();toast('Eliminado','success');await loadProds();loadInv();
+  showLoad();
+  await sb(`/rest/v1/productos?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({activo:false})});
+  auditLog('producto_eliminado',{nombre:name,id});
+  hideLoad();toast('Eliminado','success');await loadProds();loadInv();
 }
 
 function exportProds(){
@@ -3973,6 +3979,166 @@ function closeLegal() {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeLegal();
 });
+
+
+// ═══════════════════════════════════════════════════
+// FASE 2 — SEGURIDAD Y AUDITORÍA
+// ═══════════════════════════════════════════════════
+
+// Session control
+function registerSession(){
+  if(!S.user)return;
+  const session={
+    user_id:S.user.id,
+    negocio_id:S.user.nid,
+    login:S.user.login,
+    device:navigator.userAgent.slice(0,80),
+    started_at:new Date().toISOString(),
+    ip:'client'
+  };
+  // Store active sessions in localStorage (per device)
+  const sessions=JSON.parse(localStorage.getItem('ox_sessions')||'[]');
+  sessions.unshift(session);
+  localStorage.setItem('ox_sessions',JSON.stringify(sessions.slice(0,10)));
+  // Log to Supabase audit
+  auditLog('login',{user:S.user.login,device:navigator.platform});
+}
+
+// Audit log - write to audit_logs table
+async function auditLog(action,details={}){
+  if(!S.user)return;
+  try{
+    await _realSb('/rest/v1/audit_logs',{method:'POST',body:JSON.stringify({
+      negocio_id:S.user.nid,
+      usuario_id:S.user.id,
+      usuario_nombre:S.user.name||S.user.login,
+      accion:action,
+      detalles:JSON.stringify(details),
+      created_at:new Date().toISOString()
+    })});
+  }catch(e){/* non-critical */}
+}
+
+// Wrapper: audit price change
+const _origSaveProd=saveProd;
+async function saveProdAudit(id){
+  if(id){
+    const old=S.products.find(p=>p.id===id);
+    const newPrice=parseFloat($('pP')?.value)||0;
+    if(old&&old.price!==newPrice){
+      auditLog('precio_cambio',{
+        producto:old.name,
+        precio_anterior:old.price,
+        precio_nuevo:newPrice
+      });
+    }
+  }
+  return _origSaveProd(id);
+}
+
+// Audit stock adjustment
+async function auditStockAdjust(pid,oldStock,newStock,reason){
+  const p=S.products.find(p=>p.id===pid);
+  auditLog('stock_ajuste',{
+    producto:p?p.name:pid,
+    stock_anterior:oldStock,
+    stock_nuevo:newStock,
+    motivo:reason||'Manual'
+  });
+}
+
+// Soft delete sale with audit
+async function anularVenta(vid,reason){
+  if(!confirm('¿Anular esta venta? Se registrará en auditoría.'))return;
+  showLoad();
+  await sb(`/rest/v1/ventas?id=eq.${vid}`,{method:'PATCH',body:JSON.stringify({estado:'anulada',notas_anulacion:reason||'Anulada por usuario'})});
+  auditLog('venta_anulada',{venta_id:vid,motivo:reason||'Manual'});
+  hideLoad();
+  toast('Venta anulada','warn');
+}
+
+// Show audit log section
+async function loadAuditLog(){
+  if(!S.user)return;
+  const r=await sb(`/rest/v1/audit_logs?negocio_id=eq.${S.user.nid}&order=created_at.desc&limit=50`);
+  const items=r.data||[];
+  const el=$('auditList');
+  if(!el)return;
+  if(!items.length){el.innerHTML='<div class="empty-state"><div class="icon">📋</div><p>Sin registros de auditoría</p></div>';return;}
+
+  const icons={
+    'login':'🔐','logout':'🚪',
+    'precio_cambio':'💰','stock_ajuste':'📦',
+    'venta_anulada':'❌','producto_eliminado':'🗑',
+    'usuario_creado':'👤','config_cambio':'⚙️'
+  };
+  el.innerHTML=items.map(log=>{
+    let detalles={};
+    try{detalles=JSON.parse(log.detalles||'{}');}catch{}
+    const icon=icons[log.accion]||'📝';
+    const desc=formatAuditAction(log.accion,detalles);
+    return`<div class="data-item">
+      <div class="d-icon" style="background:var(--surface2)">${icon}</div>
+      <div class="d-info">
+        <div class="d-title">${desc}</div>
+        <div class="d-sub">${fmtDT(log.created_at)} · ${esc(log.usuario_nombre||'Sistema')}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function formatAuditAction(action,d){
+  switch(action){
+    case 'login': return'Inicio de sesión'+(d.device?' desde '+d.device:'');
+    case 'logout': return'Cierre de sesión';
+    case 'precio_cambio': return`Precio cambiado: ${esc(d.producto||'')} $${d.precio_anterior}→$${d.precio_nuevo}`;
+    case 'stock_ajuste': return`Stock ajustado: ${esc(d.producto||'')} ${d.stock_anterior}→${d.stock_nuevo}`;
+    case 'venta_anulada': return`Venta anulada${d.motivo?' — '+esc(d.motivo):''}`;
+    case 'producto_eliminado': return`Producto eliminado: ${esc(d.nombre||'')}`;
+    case 'usuario_creado': return`Usuario creado: ${esc(d.login||'')}`;
+    default: return esc(action);
+  }
+}
+
+// Active sessions viewer
+function showSessions(){
+  const sessions=JSON.parse(localStorage.getItem('ox_sessions')||'[]');
+  openModal('🔐 Sesiones activas',
+    sessions.length===0
+      ? '<div class="empty-state"><div class="icon">🔐</div><p>Sin historial de sesiones</p></div>'
+      : `<div class="data-list">${sessions.map((s,i)=>`
+          <div class="data-item">
+            <div class="d-icon" style="background:${i===0?'var(--accent-glow)':'var(--surface2)'}">${i===0?'✓':'💻'}</div>
+            <div class="d-info">
+              <div class="d-title">${esc(s.login)} ${i===0?'<span class="badge badge-accent">Actual</span>':''}</div>
+              <div class="d-sub">${fmtDT(s.started_at)} · ${esc((s.device||'').slice(0,40))}</div>
+            </div>
+          </div>`).join('')}</div>`
+  );
+}
+
+// Add audit log to sidebar
+function addAuditToSettings(){
+  // Called after startApp
+  const auditSection=document.getElementById('sec-settings');
+  if(!auditSection||document.getElementById('auditList'))return;
+  const auditHTML=`
+    <div class="card" style="margin-top:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div class="card-title" style="margin-bottom:0">📋 Auditoría de cambios</div>
+        <button class="btn btn-outline btn-sm" onclick="loadAuditLog()">↻ Actualizar</button>
+      </div>
+      <div id="auditList" class="data-list"></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div class="card-title" style="margin-bottom:0">🔐 Control de sesiones</div>
+        <button class="btn btn-outline btn-sm" onclick="showSessions()">Ver historial</button>
+      </div>
+      <div style="font-size:13px;color:var(--text2)">Última sesión registrada en este dispositivo.</div>
+    </div>`;
+  auditSection.insertAdjacentHTML('beforeend',auditHTML);
+}
 
 
 // Globals for inline onclick
