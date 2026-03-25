@@ -2231,12 +2231,36 @@ async function saveProd(id){
   const name=$('pN').value.trim();if(!name){toast('Nombre requerido','warn');return;}
   const variants=collectVariants();
   const gallery=collectGallery();
-  const data={negocio_id:S.user.nid,nombre:name,categoria:$('pC').value.trim(),proveedor:$('pS').value.trim(),precio_costo:parseFloat($('pCo').value)||0,precio_venta:parseFloat($('pP').value)||0,stock:$('pSt').value!==''?parseInt($('pSt').value):0,stock_min:parseInt($('pMs').value)||5,unidad:$('pU').value,cantidad_minima:parseFloat($('pMq').value)||1,codigo:$('pBc').value.trim(),imagen_url:$('pIm').value.trim(),notas:$('pNo').value.trim(),variantes:variants.length?JSON.stringify(variants):null,galeria:gallery.length?JSON.stringify(gallery):null};
+  // Core fields always present in DB
+  const coreData={
+    nombre:name,
+    categoria:$('pC').value.trim(),
+    proveedor:$('pS').value.trim()||'',
+    precio_costo:parseFloat($('pCo').value)||0,
+    precio_venta:parseFloat($('pP').value)||0,
+    stock:$('pSt').value!==''?parseInt($('pSt').value):0,
+    stock_min:parseInt($('pMs').value)||5,
+    codigo:$('pBc').value.trim()||'',
+    imagen_url:$('pIm').value.trim()||'',
+  };
+  // Optional fields - only include if column likely exists
+  const optData={};
+  if($('pNo'))optData.notas=$('pNo').value.trim();
+  if($('pU'))optData.unidad=$('pU').value||'unidad';
+  if($('pMq'))optData.cantidad_minima=parseFloat($('pMq').value)||1;
+  if(variants.length||true)optData.variantes=variants.length?JSON.stringify(variants):null;
+  if(gallery.length||true)optData.galeria=gallery.length?JSON.stringify(gallery):null;
+
+  const data={...coreData,...optData};
+  const postData={...data,negocio_id:S.user.nid};
+
   showLoad();
   // If editing, save old price to history
   let oldPrice=null;
   if(id){const op=S.products.find(p=>p.id===id);if(op&&op.price!==data.precio_venta){oldPrice=op.price;}}
-  const r=id?await sb(`/rest/v1/productos?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({...data,updated_at:new Date().toISOString()})}):await sb('/rest/v1/productos',{method:'POST',body:JSON.stringify(data)});
+  const r=id
+    ?await sb(`/rest/v1/productos?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({...data,updated_at:new Date().toISOString()})})
+    :await sb('/rest/v1/productos',{method:'POST',body:JSON.stringify(postData)});
   if(r.ok&&id&&oldPrice!==null)savePriceToHistory(id,data.precio_venta,oldPrice,data.precio_costo);
   hideLoad();
   if(r.ok){toast(id?'Actualizado':'Creado','success');closeModal();await loadProds();loadInv();}
