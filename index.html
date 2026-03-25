@@ -3028,9 +3028,11 @@ document.addEventListener('DOMContentLoaded',async ()=>{
       return;
     }
     const pc=e.target.closest('.prod-card');
-    if(pc&&!e.target.closest('.prod-add')){
+    // Only handle card click if NOT clicking the + button (avoid double add)
+    if(pc&&!e.target.closest('.prod-add')&&!e.target.closest('[data-pid]')){
       const p=S.products.find(p=>p.id===pc.dataset.pid);
       if(p&&p.unit!=='unidad'){showUnitQtyPicker(p);return;}
+      // Card click: always go to variant picker if has variants
       if(p&&p.variants){let v=p.variants;try{if(typeof v==='string')v=JSON.parse(v);}catch{}if(Array.isArray(v)&&v.length){showVariantPicker(p,(prod,varLabel)=>{addToCartWithVariant(prod,varLabel);});return;}}
       addToCart(pc.dataset.pid);return;
     }
@@ -5464,26 +5466,33 @@ function renderInvList(){
 function showCatManager(){
   if(!S.products.length){toast('Carga el inventario primero','warn');showSec('inventory');return;}
   const cats=[...new Set(S.products.map(p=>p.cat).filter(Boolean))].sort();
-  openModal('🏷 Categorías',`
-    <div style="margin-bottom:12px;font-size:13px;color:var(--text2)">
-      Edita las categorías directamente en cada producto. Las categorías se crean automáticamente al guardar.
-    </div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
-      ${cats.map(c=>`<div style="display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);padding:6px 10px">
-        <span style="font-size:13px">${esc(c)}</span>
-        <button onclick="renameCat('${esc(c)}')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px;padding:0 2px" title="Renombrar">✏️</button>
-      </div>`).join('')}
+  const counts={};S.products.forEach(p=>{if(p.cat)counts[p.cat]=(counts[p.cat]||0)+1;});
+
+  openModal('🏷 Gestionar Categorías',`
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">${cats.length} categorías · ${S.products.length} productos en total</div>
+    <div class="data-list" style="margin-bottom:14px">
+      ${cats.map(c=>`
+        <div class="data-item">
+          <div class="d-icon" style="background:var(--surface);font-size:16px">🏷</div>
+          <div class="d-info">
+            <div class="d-title">${esc(c)}</div>
+            <div class="d-sub">${counts[c]||0} productos</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick="renameCat('${esc(c)}')">✏️ Renombrar</button>
+          </div>
+        </div>`).join('')}
     </div>
     <div style="background:var(--surface);border-radius:var(--r);padding:12px">
-      <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--text2)">Renombrar categoría</div>
-      <div style="display:flex;gap:8px">
-        <input type="text" id="catFrom" placeholder="Categoría actual" style="flex:1;padding:7px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px">
-        <span style="line-height:32px;color:var(--text3)">→</span>
-        <input type="text" id="catTo" placeholder="Nuevo nombre" style="flex:1;padding:7px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em">Renombrar</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="catFrom" placeholder="Nombre actual" style="flex:1;min-width:100px;padding:7px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px">
+        <span style="color:var(--text3)">→</span>
+        <input type="text" id="catTo" placeholder="Nuevo nombre" style="flex:1;min-width:100px;padding:7px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px">
+        <button class="btn btn-primary btn-sm" onclick="applyRenamecat()">Aplicar</button>
       </div>
     </div>`,
-  `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>
-   <button class="btn btn-primary" onclick="applyRenamecat()">Renombrar</button>`);
+  `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>`);
 }
 
 function renameCat(name){
