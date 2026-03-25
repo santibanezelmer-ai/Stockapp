@@ -1179,7 +1179,7 @@ body.app-active footer.site-footer{
 <div id="appScreen" class="screen hidden">
   <header class="topbar">
     <div class="topbar-brand">
-      <div class="top-logo" id="topLogo">⚡</div>
+      <div class="top-logo" id="topLogo" style="padding:2px;overflow:hidden"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAFRUlEQVR4nJWX228UVRzHP+fMzN7bQin0hj6YqFy8JVyMFtEQjBBjMPpAiI+aICZKAgSj0X9AJVFjog9IookRDQ8aXlAwQYIavATBakl8sEjdggjtbtvtTrszPx9mZ3ZuXfEke5kzv/P7fn+X8zu/o8p/jIjWCgARUEohCOGhIJhRofmoVJqsCiQTsuLNmkqpYIVSKrYwqji2Gk/ch2yBqbBc6npvQqEwU7AiIMnVyl9NVCAuLC1eElseUqjDOImh0qjHBESiCCLNz8K8WpOC9p8lwSKMrliQjW+Rr0OplPe0CPmkmoA6Kicxi2K/En72Py0zA+h4yNp4UiuayZcQSPFdu3B4iiARUwmiEiHkE4hqCGHHQpuC1pRxo3Ip/6P2+ZPel44ghuMUGB5OsJBy1wGtwTS9XxFwGiQ8FTck8iwegUTYw+FtKnNdQURwXdebyBeR+ixSrSBzNmSy0NEJpgW+TNhhvm4/SZt4JvF3cbZNV5XyORzHQQHTjoN75APkzCm0YUI2C4uXoG9dhV63AdU7ALWZBFjCo4ApCMqvffGYN7d5xjQ4dPIYx879wFNDm9i+YTNXy2M4V6/gaI1WoK+UcYfP4pw4irFtB8aDj4Bdb2pPscmHKI+OiCKl+CpwXKGrUODE8FmeO/QW+WyOnGXx/JYneOC21XRcGafLnmXq/I+4P32L1gbiOMj0FMYzuzE2bIaZGS9HQgSCqCgwQSVqh58DWinm5hsgQjGfw1IGCsVrn3/MwVInhY5OHr57Lc/u3Mvc8dtpHD4IuQIUHJxTxzHWb0wUpmitUGgVAw1LaaWYnbP54vBRHl+5juV9fVhZi2KpQM2dY/z6ZUZ+/w1ntoZecx+OYWHOVNHTVaRQAsNcuIhGkjCReN7GbTQadC/ppmfpEt589Q22PLaFwcEeXEsjAobtsO/RHWTqs1Q+fJdiV4lrg+vI9g/QPXQ/dddNPVkJWW0GEylFxzANJicm2b/3BepzNq8feDt4l9MWdXeePqvISz0Gi6+Pc+DOnXw6XMP622DfADy51mVqPlLtPFhp5YAqj16Q/zr0HMdh0aIufj4/zEefHOHkqdOM/VWmPmsjwOahe9m+bSsTS9fz2emLZDImu7bewqa7eqnZDXQoD+JJqMqjI6LbwAuQz+UAyOdziAi12VnK5ctUp6YwDQMHoaenh5t7u5mpN3CcBlnLoGY7wb6Pbz+fhZkao8BVgmVZnPtlmIuXxuhbtow7Vq+kUqmyfHAA0zSpVKt0dnZQmaxw+vtzFPJZVq1YQWVqGq0VpmEgIski53OIhCBwlXeCmYZBpVrl6V27eeXFPbzz3vv09/XSUSpSt+eoVqvMzzcYGOhHIRSLRbTW/DpygZsGB3h5/x5s2w5avSR6KoHoGa+1wTffnWFiYpLlg/18+dXXlIoF1q65h8nJCrZt093dzbKlPWQyGf68NEatVsOyLB7aONSKYyoBhRofvSAqZHk0WN6fQiGP47hYpsk/166Ry+UoFQsAOI538DSchuc108A0TVzHZaZWW9D1PgGz1e1EMCNjenoaUNREKOTzuK5LtToVKGn28yhgzm6haa3b9BQeqOn3hJGK6PeaeMmjtdF8JzjNo1ZpHQ1bc52Stl1sYgS7IOL5RFeT7O8lLNDWyvZD+0qDUKkWUNsWMLKoSWXBWLchEL40BTcdFWIRZxNp10Lg7XBkgUfxy3SiB5SWiT6puAbf88F17sYjEdaWPA0jWLH7wAJ3Dj8R1f/NBRXqCeOYqfakAYiQ7GhufGhfbyr5uN60PFiQmS+XvBmFpf8FwnIu9TWppIIAAAAASUVORK5CYII=" style="width:100%;height:100%;object-fit:contain;border-radius:6px"></div>
       <div>
         <span class="top-biz" id="topBiz">Mi Negocio</span>
         <div id="topSucursal" class="hidden" style="font-size:10px;color:var(--accent-light);font-weight:700;letter-spacing:0.02em;cursor:pointer" onclick="showSucursalPicker()">📍 <span id="topSucursalName">Principal</span> ▾</div>
@@ -1864,24 +1864,8 @@ async function startApp(){
   const base='operixerp.cloud';
   const isApex=host===base||host==='www.'+base;
 
-  // If arrived via ?oxtoken=... restore session from token
-  const params=new URLSearchParams(window.location.search);
-  const token=params.get('oxtoken');
-  if(token){
-    try{
-      const stored=localStorage.getItem('oxtoken_'+token);
-      if(stored){
-        S.user=JSON.parse(stored);
-        localStorage.removeItem('oxtoken_'+token);
-        sessionStorage.setItem('ox_user',JSON.stringify(S.user));
-        // Clean URL
-        window.history.replaceState({},'',window.location.pathname);
-      }
-    }catch(e){console.warn('Token restore:',e);}
-  }
-
   // If on apex domain, redirect to slug subdomain
-  if(isApex&&S.user?.nid){
+  if(isApex&&S.user?.nid&&!S._skipApexRedirect){
     try{
       const res=await fetch(SB+'/rest/v1/negocios?id=eq.'+S.user.nid+'&select=slug',{
         headers:{apikey:SK,Authorization:'Bearer '+SK}
@@ -3103,6 +3087,8 @@ document.addEventListener('DOMContentLoaded',async ()=>{
         localStorage.removeItem('oxtoken_'+_tok);
         sessionStorage.setItem('ox_user',JSON.stringify(S.user));
         window.history.replaceState({},'',window.location.pathname);
+        // Skip apex redirect - we're already on the correct subdomain
+        S._skipApexRedirect=true;
         startApp();return;
       }
     }catch(e){}
