@@ -1156,6 +1156,7 @@ body.desktop #toasts{bottom:20px}
       <!-- DASHBOARD -->
       <section class="section" id="sec-dashboard">
         <div class="sec-hd"><h2>Dashboard</h2><button class="btn btn-ghost btn-sm" id="dashRefreshBtn">↻ Actualizar</button></div>
+        <div id="smartDashWidgets" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:16px"></div>
         <div class="stats-grid">
           <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Ventas hoy</div><div class="stat-value green" id="dashSales">$0</div></div>
           <div class="stat-card"><div class="stat-icon">📈</div><div class="stat-label">Ganancia</div><div class="stat-value accent" id="dashProfit">$0</div></div>
@@ -1801,8 +1802,7 @@ async function startApp(){
   await Promise.all([loadProds(),loadClients()]);
   showSec('dashboard');
   setDesktop(localStorage.getItem('ox_desktop')==='1');
-  // Add audit section to settings
-  setTimeout(addAuditToSettings, 500);
+  // Audit section added lazily when settings opens
   // FASE 4: keyboard shortcuts
   initKeyboardShortcuts();
 }
@@ -1848,6 +1848,8 @@ function loadCfgUI(){
   const ms=(S.cfg.methods||'').split(',');
   ['efectivo','transferencia','tarjeta','fiado'].forEach(m=>{const cb=$('pm_'+m);if(cb)cb.checked=ms.includes(m);});
   loadUsersList();
+  // Add audit widgets if not already there
+  if(!document.getElementById('auditList')) addAuditToSettings();
 }
 
 async function saveCfg(data){
@@ -4013,6 +4015,7 @@ document.addEventListener('keydown', e => {
 
 // Session control
 function registerSession(){
+  try{
   if(!S.user)return;
   const session={
     user_id:S.user.id,
@@ -4028,6 +4031,7 @@ function registerSession(){
   localStorage.setItem('ox_sessions',JSON.stringify(sessions.slice(0,10)));
   // Log to Supabase audit
   auditLog('login',{user:S.user.login,device:navigator.platform});
+  }catch(e){}
 }
 
 // Audit log - write to audit_logs table
@@ -4087,6 +4091,11 @@ async function anularVenta(vid,reason){
 async function loadAuditLog(){
   if(!S.user)return;
   const r=await sb(`/rest/v1/audit_logs?negocio_id=eq.${S.user.nid}&order=created_at.desc&limit=50`);
+  if(!r.ok){
+    const el=$('auditList');
+    if(el)el.innerHTML='<div class="empty-state"><div class="icon">📋</div><p>Tabla de auditoría no disponible.<br><small>Ejecuta el SQL de FASE 2 en Supabase.</small></p></div>';
+    return;
+  }
   const items=r.data||[];
   const el=$('auditList');
   if(!el)return;
@@ -4173,6 +4182,7 @@ function addAuditToSettings(){
 
 async function loadSmartDash(){
   if(!S.user)return;
+  try{
   const nid=S.user.nid;
   const today=new Date().toISOString().slice(0,10);
   const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
@@ -4204,6 +4214,7 @@ async function loadSmartDash(){
 
   // Render smart widgets
   renderSmartWidgets({todayRev,yestRev,pctChange,todaySales,debtors,lowStock,topProds});
+  }catch(e){console.warn('Smart dash error:',e);}
 }
 
 function renderSmartWidgets({todayRev,yestRev,pctChange,todaySales,debtors,lowStock,topProds}){
@@ -4379,6 +4390,7 @@ async function showClientPro(cid){
 
 async function loadSmartStock(){
   if(!S.user)return;
+  try{
   const [prodsR,salesR]=await Promise.all([
     sb(`/rest/v1/productos?negocio_id=eq.${S.user.nid}&activo=eq.true&select=id,nombre,stock,stock_min,precio_costo,precio_venta`),
     sb(`/rest/v1/detalle_ventas?select=producto_id,cantidad&order=created_at.desc`)
@@ -4405,6 +4417,7 @@ async function loadSmartStock(){
 
   S.smartStock=enriched;
   renderSmartStock(enriched);
+  }catch(e){const el=document.getElementById('smartStockList');if(el)el.innerHTML='<div class="empty-state"><p>Error cargando datos</p></div>';}
 }
 
 function renderSmartStock(prods){
