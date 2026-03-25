@@ -2845,6 +2845,13 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   initCatalog();
   if(window.location.search.includes('pedido=1'))return;
 
+  // If on /login path, clear any stale sessions so previous user's subdomain isn't used
+  if(window.location.pathname==='/login'||window.location.pathname==='/login/'){
+    sessionStorage.removeItem('ox_user');
+    // Clear all stale oxtoken keys from localStorage
+    Object.keys(localStorage).filter(k=>k.startsWith('oxtoken_')).forEach(k=>localStorage.removeItem(k));
+  }
+
   // Auth
   $('loginBtn').addEventListener('click',doLogin);
   $('loginPass').addEventListener('keypress',e=>e.key==='Enter'&&doLogin());
@@ -3077,6 +3084,12 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   if(magicLogin){startApp();return;}
 
   // Check for oxtoken in URL (cross-subdomain session handoff)
+  // Skip token restore if we're on /login (fresh login intent)
+  if(window.location.pathname==='/login'||window.location.pathname==='/login/'){
+    // Show login screen directly, no auto-restore
+    $('loginScreen')?.classList.remove('hidden');
+    // Skip rest of auth flow
+  } else {
   const _params=new URLSearchParams(window.location.search);
   const _tok=_params.get('oxtoken');
   if(_tok){
@@ -3095,6 +3108,7 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   }
   const saved=sessionStorage.getItem('ox_user');
   if(saved){try{S.user=JSON.parse(saved);startApp();}catch{sessionStorage.removeItem('ox_user');}}
+  } // end else (not /login)
 });
 
 // ═══════════════════════════════════════════════════
