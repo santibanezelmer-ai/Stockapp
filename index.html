@@ -956,31 +956,52 @@ body.app-active footer.site-footer{
   .auth-box{padding:28px 22px}
 }
 
+/* ══ POS LAYOUT ════════════════════════════════════ */
+#posLayout{
+  display:grid;
+  grid-template-columns:1fr 300px;
+  gap:14px;
+  align-items:start;
+  margin-top:4px;
+}
+#cartPanel{
+  position:sticky;
+  top:4px;
+  background:var(--bg2);
+  border:1.5px solid var(--border2);
+  border-radius:var(--r3);
+  overflow:hidden;
+}
+
 /* ══ MOBILE IMPROVEMENTS (FASE 5) ════════════════ */
 @media(max-width:768px){
-  /* POS layout */
-  #posLayout{grid-template-columns:1fr!important}
-  #posLayout>div:last-child{position:static!important;margin-top:12px}
+  /* POS layout: stack vertically */
+  #posLayout{
+    grid-template-columns:1fr;
+  }
+  #cartPanel{
+    position:static;
+    top:auto;
+    margin-top:12px;
+  }
   /* Stats grid */
-  .stats-grid{grid-template-columns:1fr 1fr!important}
-  /* Prod grid */
-  .prod-grid{grid-template-columns:1fr 1fr!important}
+  .stats-grid{grid-template-columns:1fr 1fr}
+  /* Prod grid stays 2 cols */
+  .prod-grid{grid-template-columns:1fr 1fr}
   /* Sections padding */
-  .section{padding:12px 14px!important}
+  .section{padding:12px 14px}
   /* Smart dash */
-  #smartDashWidgets{grid-template-columns:1fr!important}
+  #smartDashWidgets{grid-template-columns:1fr}
   /* Topbar */
   .topbar{padding:10px 12px}
   .top-biz{font-size:14px}
-  /* Hide less important cols on mobile */
   .hide-mobile{display:none!important}
-  /* Card padding */
   .card{padding:12px}
-  /* sec-hd wrap */
   .sec-hd{flex-wrap:wrap;gap:8px}
   .sec-hd h2{font-size:18px}
-  /* Cart on mobile full width */
-  .cart-box{margin-top:8px}
+  /* Touch targets */
+  .prod-card{touch-action:manipulation}
+  .prod-add{touch-action:manipulation;min-width:40px;min-height:40px;width:40px;height:40px;font-size:22px}
 }
 @media(max-width:480px){
   .stats-grid{grid-template-columns:1fr!important}
@@ -1244,13 +1265,13 @@ body.app-active footer.site-footer{
         <div class="filters" id="salesCats"></div>
 
         <!-- POS: grid izq + carrito der -->
-        <div id="posLayout" style="display:grid;grid-template-columns:1fr 300px;gap:14px;align-items:start;margin-top:4px">
+        <div id="posLayout">
 
           <!-- Productos -->
           <div class="prod-grid" id="prodGrid"></div>
 
           <!-- Carrito fijo -->
-          <div id="cartPanel" style="position:sticky;top:4px;background:var(--bg2);border:1.5px solid var(--border2);border-radius:var(--r3);overflow:hidden">
+          <div id="cartPanel">
 
             <!-- Header carrito -->
             <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
