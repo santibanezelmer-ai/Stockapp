@@ -1815,7 +1815,7 @@ function showSec(name){
   $$('.nav-btn[data-sec],.sid-btn[data-sec]').forEach(b=>b.classList.toggle('active',b.dataset.sec===name));
   $('appContent').scrollTop=0;
   $('moreOverlay').classList.add('hidden');
-  const loaders={dashboard:loadDash,sales:()=>{loadSalesSec();setTimeout(initPOSQuickFilter,400);},inventory:loadInv,clients:renderClients,purchases:loadPurchases,debts:loadDebts,payables:loadPayables,orders:loadOrders,devolutions:loadDevolutions,accounting:loadAcc,cashflow:loadCF,reports:()=>loadRep(S.repPeriod),settings:loadCfgUI,sucursales:loadSucursales};
+  const loaders={dashboard:loadDash,sales:loadSalesSec,inventory:loadInv,clients:renderClients,purchases:loadPurchases,debts:loadDebts,payables:loadPayables,orders:loadOrders,devolutions:loadDevolutions,accounting:loadAcc,cashflow:loadCF,reports:()=>loadRep(S.repPeriod),settings:loadCfgUI,sucursales:loadSucursales};
   if(loaders[name])loaders[name]();
 }
 
@@ -1940,9 +1940,12 @@ async function loadDash(){
 function loadSalesSec(){renderProdGrid();renderPayGrid();updateCart();}
 
 function renderProdGrid(q=''){
-  const lq=q.toLowerCase(),activeCat=document.querySelector('#salesCats .fpill.active');
+  const lq=(q||'').toLowerCase();
+  const activeCat=document.querySelector('#salesCats .fpill.active');
   const cat=activeCat?activeCat.dataset.cat||'':'';
-  let prods=S.products.filter(p=>(!lq||p.name.toLowerCase().includes(lq)||(p.code||'').includes(lq))&&(!cat||p.cat===cat));
+  const posFilterCat=S.posFilterCat||'';
+  const filterCat=cat||posFilterCat;
+  let prods=S.products.filter(p=>(!lq||p.name.toLowerCase().includes(lq)||(p.code||'').includes(lq))&&(!filterCat||p.cat===filterCat));
   const cats=[...new Set(S.products.map(p=>p.cat).filter(Boolean))];
   const catsEl=$('salesCats');
   if(!catsEl.querySelector('.fpill')){
@@ -1981,7 +1984,11 @@ function updateCart(){
   if(!S.cart.length){items.innerHTML='<div class="cart-empty">Sin productos</div>';sum.classList.add('hidden');$('checkoutBtn').disabled=true;return;}
   $('checkoutBtn').disabled=false;
   items.innerHTML=S.cart.map((item,idx)=>`<div class="cart-item"><span class="ci-name">${esc(item.name)}</span><span class="ci-price">${fmt(item.price)}</span><div class="qty-ctrl"><button class="qty-btn" data-idx="${idx}" data-d="-1">−</button><span class="qty-val">${item.qty}</span><button class="qty-btn" data-idx="${idx}" data-d="1">+</button></div><button class="ci-del" data-idx="${idx}">🗑</button></div>`).join('');
-  sum.classList.remove('hidden');$('cartTotal').textContent=fmt(total);
+  sum.classList.remove('hidden');
+  $('cartTotal').textContent=fmt(total);
+  // Ensure cart is visible on mobile
+  const cartBox=document.querySelector('.cart-box');
+  if(cartBox)cartBox.style.display='block';
   const cash=parseFloat($('cashRec').value)||0;
   if(S.payMethod==='efectivo'&&cash>=total){$('changeRow').textContent='Vuelto: '+fmt(cash-total);$('changeRow').classList.remove('hidden');}
   else $('changeRow').classList.add('hidden');
@@ -2015,7 +2022,7 @@ async function doCheckout(){
     if(!sr.ok)throw new Error('Error al registrar venta');
     const saleId=sr.data[0].id;
     for(const item of S.cart){
-      await sb('/rest/v1/detalle_ventas',{method:'POST',body:JSON.stringify({venta_id:saleId,producto_id:item.id,nombre:item.name,cantidad:item.qty,precio_venta:item.price,precio_costo:item.cost||0})});
+      await sb('/rest/v1/detalle_ventas',{method:'POST',body:JSON.stringify({venta_id:saleId,negocio_id:S.user.nid,producto_id:item.id,nombre:item.name,cantidad:item.qty,precio_venta:item.price,precio_costo:item.cost||0,subtotal:item.price*item.qty})});
       const pr=await sb(`/rest/v1/productos?id=eq.${item.id}&select=stock`);
       if(pr.data&&pr.data[0])await sb(`/rest/v1/productos?id=eq.${item.id}`,{method:'PATCH',body:JSON.stringify({stock:Math.max(0,pr.data[0].stock-item.qty)})});
     }
@@ -3165,7 +3172,15 @@ async function saveDevolution(){
   const motivo=$('devMotivo').value.trim(),monto=parseFloat($('devMonto').value)||0;
   if(!motivo||!monto){toast('Motivo y monto requeridos','warn');return;}
   showLoad();
-  const r=await sb('/rest/v1/devoluciones',{method:'POST',body:JSON.stringify({negocio_id:S.user.nid,tipo:$('devTipo').value,motivo,monto,descripcion:$('devDesc').value.trim(),venta_id:$('devVentaId').value.trim()||null,stock_restituido:$('devRestStock').checked,usuario_id:S.user.id})});
+  const ventaIdRaw=$('devVentaId').value.trim();
+  // Try to find full venta ID from last 6 chars
+  let ventaId=null;
+  if(ventaIdRaw){
+    const vR=await sb(`/rest/v1/ventas?negocio_id=eq.${S.user.nid}&select=id&order=created_at.desc&limit=50`);
+    const found=(vR.data||[]).find(v=>v.id.endsWith(ventaIdRaw)||v.id.slice(-6)===ventaIdRaw);
+    ventaId=found?found.id:null;
+  }
+  const r=await sb('/rest/v1/devoluciones',{method:'POST',body:JSON.stringify({negocio_id:S.user.nid,tipo:$('devTipo').value,motivo,monto,descripcion:$('devDesc').value.trim(),venta_id:ventaId,stock_restituido:$('devRestStock').checked,usuario_id:S.user.id})});
   hideLoad();
   if(r.ok){toast('Registrado','success');closeModal();loadDevolutions();}
   else toast('Error al guardar','error');
@@ -4624,8 +4639,8 @@ function initKeyboardShortcuts(){
     }
   });
 
-  // Show shortcut hint in POS
-  injectShortcutHints();
+  // Shortcut hints only on desktop
+  if(window.innerWidth>768)injectShortcutHints();
 }
 
 function injectShortcutHints(){
