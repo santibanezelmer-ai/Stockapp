@@ -1743,9 +1743,9 @@ async function doLogin(){
     const base='operixerp.cloud';
     const isApex=host===base||host==='www.'+base;
     if(slug&&isApex){
-      const tok=Math.random().toString(36).slice(2)+Date.now().toString(36);
-      localStorage.setItem('oxtoken_'+tok,JSON.stringify(S.user));
-      window.location.href='https://'+slug+'.'+base+'?oxtoken='+tok;
+      // Encode user session in URL (localStorage is NOT shared across subdomains)
+      const encoded=btoa(unescape(encodeURIComponent(JSON.stringify(S.user))));
+      window.location.href='https://'+slug+'.'+base+'?oxsession='+encoded;
     } else {
       startApp();
     }
@@ -3108,6 +3108,18 @@ document.addEventListener('DOMContentLoaded',async ()=>{
     // Skip rest of auth flow
   } else {
   const _params=new URLSearchParams(window.location.search);
+  // New: oxsession in URL (works cross-subdomain unlike localStorage)
+  const _sess=_params.get('oxsession');
+  if(_sess){
+    try{
+      S.user=JSON.parse(decodeURIComponent(escape(atob(_sess))));
+      sessionStorage.setItem('ox_user',JSON.stringify(S.user));
+      window.history.replaceState({},'',window.location.pathname);
+      S._skipApexRedirect=true;
+      startApp();return;
+    }catch(e){console.warn('Session decode error',e);}
+  }
+  // Legacy: oxtoken via localStorage (same-origin only)
   const _tok=_params.get('oxtoken');
   if(_tok){
     try{
@@ -3117,7 +3129,6 @@ document.addEventListener('DOMContentLoaded',async ()=>{
         localStorage.removeItem('oxtoken_'+_tok);
         sessionStorage.setItem('ox_user',JSON.stringify(S.user));
         window.history.replaceState({},'',window.location.pathname);
-        // Skip apex redirect - we're already on the correct subdomain
         S._skipApexRedirect=true;
         startApp();return;
       }
