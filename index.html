@@ -486,6 +486,7 @@ body.desktop .app-content{height:calc(100vh - var(--top));padding-bottom:0}
 /* ══ SALES ════════════════════════════════════════ */
 .prod-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .prod-card{
+  position:relative;z-index:1;
   background:var(--bg2);border:1.5px solid var(--border);
   border-radius:var(--r2);overflow:hidden;cursor:pointer;
   transition:all 0.18s;position:relative;
@@ -504,7 +505,7 @@ body.desktop .app-content{height:calc(100vh - var(--top));padding-bottom:0}
 .prod-unit{font-size:10px;color:var(--text3);margin-top:1px}
 .prod-stock{font-size:10px;margin-top:3px;font-weight:600}
 .prod-add{
-  position:absolute;top:8px;right:8px;
+  position:absolute;top:8px;right:8px;z-index:2;
   width:28px;height:28px;border-radius:50%;
   background:var(--accent);color:white;border:none;
   font-size:18px;display:flex;align-items:center;justify-content:center;
@@ -873,8 +874,9 @@ body.desktop #toasts{bottom:20px}
   pointer-events:none;z-index:10;
   transition:opacity 0.3s;
 }
-/* Hide legal footer when app is active */
+/* Hide legal footer when app or catalog is active */
 #appScreen:not(.hidden) ~ footer.site-footer,
+#catalogScreen:not(.hidden) ~ footer.site-footer,
 body.app-active footer.site-footer{
   display:none;
 }
@@ -1248,7 +1250,7 @@ body.app-active footer.site-footer{
           <div class="prod-grid" id="prodGrid"></div>
 
           <!-- Carrito fijo -->
-          <div style="position:sticky;top:4px;background:var(--bg2);border:1.5px solid var(--border2);border-radius:var(--r3);overflow:hidden">
+          <div id="cartPanel" style="position:sticky;top:4px;background:var(--bg2);border:1.5px solid var(--border2);border-radius:var(--r3);overflow:hidden">
 
             <!-- Header carrito -->
             <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
@@ -2667,6 +2669,9 @@ function initCatalog(){
   localStorage.setItem('ox_cat_nid',nid);
   $$('.screen').forEach(s=>s.classList.add('hidden'));
   $('catalogScreen').classList.remove('hidden');
+  // Hide legal footer in catalog mode
+  const _sf=document.querySelector('footer.site-footer');
+  if(_sf)_sf.style.display='none';
   loadCatalog(nid);
   $('catSearch').addEventListener('input',()=>renderCatalog($('catPills .cat-pill.active')?.dataset.cat||''));
   $('catFabBtn').addEventListener('click',showCatalogCart);
