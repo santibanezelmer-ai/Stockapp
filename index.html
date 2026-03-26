@@ -1988,6 +1988,24 @@ async function startApp(){
     console.error('[OperixERP] startApp sin nid - volviendo al login');
     return;
   }
+  // Quick session validation: verify login still matches DB
+  try{
+    const _vr=await _realSb(`/rest/v1/usuarios?id=eq.${S.user.id}&select=login,activo&limit=1`);
+    if(_vr.ok&&_vr.data.length){
+      const _vu=_vr.data[0];
+      if(!_vu.activo){
+        // Account deactivated
+        sessionStorage.removeItem('ox_user');
+        toast('Tu cuenta fue desactivada','error');
+        return;
+      }
+      if(_vu.login!==S.user.login){
+        // Login changed (email update) - update session silently
+        S.user.login=_vu.login;
+        sessionStorage.setItem('ox_user',JSON.stringify(S.user));
+      }
+    }
+  }catch(e){/* non-critical - continue */}
   // Normal app start
   $('loginScreen').classList.add('hidden');
   $('registerScreen').classList.add('hidden');
@@ -3754,15 +3772,25 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   if(saved){
     try{
       const u=JSON.parse(saved);
-      // Verify we're on a subdomain (not apex) before auto-restoring
       const h=window.location.hostname;
       const base='operixerp.cloud';
       const isApex=h===base||h==='www.'+base;
-      // On apex: never auto-restore (user must login explicitly)
-      // On subdomain: restore only if session belongs to this negocio
       if(!isApex){
-        S.user=u;
-        startApp();
+        // Check if admin forced a re-login (email change)
+        const forced=localStorage.getItem('ox_force_relogin_'+u.nid);
+        if(forced){
+          // Session invalidated - clear and show login
+          sessionStorage.removeItem('ox_user');
+          localStorage.removeItem('ox_force_relogin_'+u.nid);
+          // Show message to user
+          const err=document.getElementById('loginErr');
+          const user=document.getElementById('loginUser');
+          if(err){err.textContent='Tu email fue cambiado a '+forced+'. Inicia sesión con el nuevo email.';err.classList.remove('hidden');}
+          if(user) user.value=forced;
+        } else {
+          S.user=u;
+          startApp();
+        }
       }
     }catch{sessionStorage.removeItem('ox_user');}
   }
