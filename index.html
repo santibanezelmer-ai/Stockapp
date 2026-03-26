@@ -1737,6 +1737,14 @@ function showLoad(){$('loading').classList.remove('hidden');}
 function hideLoad(){$('loading').classList.add('hidden');}
 
 // SUPABASE
+// ── Password hashing (Web Crypto SHA-256) ───────────────────────────────
+async function hashPass(pass){
+  try{
+    const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pass));
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }catch{return pass;} // fallback si crypto no disponible
+}
+
 async function sb(path,opts={}){
   const headers={'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK,'Prefer':'return=representation',...(opts.headers||{})};
   const res=await fetch(SB+path,{...opts,headers});
@@ -1760,7 +1768,8 @@ async function doLogin(){
 
   showLoad();
   try{
-    const r=await _realSb(`/rest/v1/usuarios?login=eq.${encodeURIComponent(u)}&password=eq.${encodeURIComponent(p)}&activo=eq.true`);
+    const _ph=await hashPass(p);
+    const r=await _realSb(`/rest/v1/usuarios?login=eq.${encodeURIComponent(u)}&password=eq.${encodeURIComponent(_ph)}&activo=eq.true`);
     if(!r.ok||!r.data.length){
       lockData.attempts=(lockData.attempts||0)+1;
       if(lockData.attempts>=5){lockData.lockedUntil=Date.now()+15*60*1000;lockData.attempts=0;}
@@ -2904,7 +2913,10 @@ function showAddUser(){
 async function saveUser(){
   const name=$('uN').value.trim(),login=$('uL').value.trim(),pass=$('uP').value.trim(),role=$('uR').value;
   if(!name||!login||!pass){toast('Completa todos los campos','warn');return;}if(pass.length<6){toast('Contraseña mínimo 6 caracteres','warn');return;}
-  showLoad();const r=await sb('/rest/v1/usuarios',{method:'POST',body:JSON.stringify({negocio_id:S.user.nid,nombre:name,login,password:pass,rol:role})});hideLoad();
+  showLoad();
+  const _hp=await hashPass(pass);
+  const r=await sb('/rest/v1/usuarios',{method:'POST',body:JSON.stringify({negocio_id:S.user.nid,nombre:name,login,password:_hp,rol:role})});
+  hideLoad();
   if(r.ok){toast('Usuario creado','success');closeModal();loadUsersList();}else toast('Error','error');
 }
 
@@ -4047,9 +4059,10 @@ async function forgotSavePassword(){
 
   showLoad();
   try{
+    const _hp2=await hashPass(newPass);
     const r = await _realSb(`/rest/v1/usuarios?id=eq.${_forgotUserId}`, {
       method: 'PATCH',
-      body: JSON.stringify({password: newPass, updated_at: new Date().toISOString()})
+      body: JSON.stringify({password: _hp2, updated_at: new Date().toISOString()})
     });
     hideLoad();
     if(r.ok){
@@ -4509,7 +4522,7 @@ async function loadSmartDash(){
     sb(`/rest/v1/ventas?negocio_id=eq.${nid}&created_at=gte.${yesterday}T00:00:00&created_at=lt.${today}T00:00:00&estado=neq.anulada&select=total`),
     sb(`/rest/v1/clientes?negocio_id=eq.${nid}&deuda_total=gt.0&select=nombre,deuda_total&order=deuda_total.desc&limit=5`),
     sb(`/rest/v1/productos?negocio_id=eq.${nid}&activo=eq.true&select=nombre,stock,stock_min&order=stock.asc&limit=5`),
-    sb(`/rest/v1/detalle_ventas?select=producto_id,cantidad,productos(nombre)&order=cantidad.desc&limit=100`),
+    sb(`/rest/v1/detalle_ventas?negocio_id=eq.${S.user.nid}&select=producto_id,cantidad,productos(nombre)&order=cantidad.desc&limit=100`),
   ]);
 
   const todaySales=todayR.data||[];
@@ -4710,7 +4723,7 @@ async function loadSmartStock(){
   try{
   const [prodsR,salesR]=await Promise.all([
     sb(`/rest/v1/productos?negocio_id=eq.${S.user.nid}&activo=eq.true&select=id,nombre,stock,stock_min,precio_costo,precio_venta`),
-    sb(`/rest/v1/detalle_ventas?select=producto_id,cantidad&order=created_at.desc`)
+    sb(`/rest/v1/detalle_ventas?negocio_id=eq.${S.user.nid}&select=producto_id,cantidad&order=created_at.desc`)
   ]);
 
   const prods=prodsR.data||[];
