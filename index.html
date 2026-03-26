@@ -2256,7 +2256,24 @@ function showProdForm(p=null){
   openModal(p?'Editar Producto':'Nuevo Producto',`
     <div class="form-group"><label>Nombre *</label><input type="text" id="pN" value="${esc(p?.name||'')}"></div>
     <div class="form-row">
-      <div class="form-group"><label>Categoría</label><input type="text" id="pC" value="${esc(p?.cat||'')}"></div>
+      <div class="form-group">
+        <label>Categoría</label>
+        <div style="display:flex;gap:6px">
+          <select id="pCsel" onchange="
+            if(this.value==='__new__'){
+              document.getElementById('pC').style.display='block';
+              document.getElementById('pC').focus();
+              document.getElementById('pC').value='';
+            } else {
+              document.getElementById('pC').value=this.value;
+            }" style="flex:1;padding:9px 11px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
+            <option value="">Sin categoría</option>
+            ${[...new Set(S.products.map(p=>p.cat).filter(Boolean))].sort().map(c=>`<option value="${esc(c)}"${p?.cat===c?' selected':''}>${esc(c)}</option>`).join('')}
+            <option value="__new__">+ Nueva categoría...</option>
+          </select>
+        </div>
+        <input type="text" id="pC" value="${esc(p?.cat||'')}" placeholder="Nombre de nueva categoría" style="margin-top:6px;display:none;width:100%;padding:9px 11px;background:var(--bg2);border:1.5px solid var(--accent);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
+      </div>
       <div class="form-group"><label>Proveedor</label><input type="text" id="pS" value="${esc(p?.supplier||'')}"></div>
     </div>
     <div class="form-row">
@@ -2340,7 +2357,7 @@ async function saveProd(id){
   // Core fields always present in DB
   const coreData={
     nombre:name,
-    categoria:$('pC').value.trim(),
+    categoria:(()=>{const sel=$('pCsel');const inp=$('pC');if(inp&&inp.style.display!=='none'&&inp.value.trim())return inp.value.trim();if(sel&&sel.value&&sel.value!=='__new__')return sel.value;return '';})(),
     proveedor:$('pS').value.trim()||'',
     precio_costo:parseFloat($('pCo').value)||0,
     precio_venta:parseFloat($('pP').value)||0,
