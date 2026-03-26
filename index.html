@@ -1787,8 +1787,18 @@ async function doLogin(){
 
   showLoad();
   try{
+    // Try hashed first, then plaintext (for accounts created before hash migration)
     const _ph=await hashPass(p);
-    const r=await _realSb(`/rest/v1/usuarios?login=eq.${encodeURIComponent(u)}&password=eq.${encodeURIComponent(_ph)}&activo=eq.true`);
+    let r=await _realSb(`/rest/v1/usuarios?login=eq.${encodeURIComponent(u)}&password=eq.${encodeURIComponent(_ph)}&activo=eq.true`);
+    // Fallback: try plaintext for pre-hash accounts
+    if(!r.ok||!r.data.length){
+      r=await _realSb(`/rest/v1/usuarios?login=eq.${encodeURIComponent(u)}&password=eq.${encodeURIComponent(p)}&activo=eq.true`);
+      // If plaintext login works, upgrade the password to hash
+      if(r.ok&&r.data.length){
+        const _uid=r.data[0].id;
+        _realSb(`/rest/v1/usuarios?id=eq.${_uid}`,{method:'PATCH',body:JSON.stringify({password:_ph})});
+      }
+    }
     if(!r.ok||!r.data.length){
       lockData.attempts=(lockData.attempts||0)+1;
       if(lockData.attempts>=5){lockData.lockedUntil=Date.now()+15*60*1000;lockData.attempts=0;}
