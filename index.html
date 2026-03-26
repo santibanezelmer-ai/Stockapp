@@ -1347,9 +1347,12 @@ body.app-active footer.site-footer{
         <div class="sec-hd">
           <h2>Inventario <small id="invCount"></small></h2>
           <div class="sec-hd-right">
+            <button class="btn btn-outline btn-sm" onclick="toggleInvView()" id="invViewBtn" title="Cambiar vista">⊞</button>
+            <button class="btn btn-outline btn-sm" onclick="showCatManager()" title="Gestionar categorías">🏷</button>
             <button class="btn btn-outline btn-sm" id="exportInvBtn">📤</button>
             <button class="btn btn-outline btn-sm" id="importInvBtn">📥</button>
             <input type="file" id="importFile" accept=".csv" class="hidden">
+            <button class="btn btn-outline btn-sm" onclick="showSmartStock()" title="Stock inteligente">🧠</button>
             <button class="btn btn-primary btn-sm" id="addProdBtn">+ Producto</button>
           </div>
         </div>
