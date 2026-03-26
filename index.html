@@ -6150,6 +6150,59 @@ function clearLoginLock(){
   toast('Bloqueo eliminado, puedes intentar nuevamente','success');
 }
 
+// ═══════════════════════════════════════════════════
+// CUENTAS POR PAGAR (restored after purchases v2 replacement)
+// ═══════════════════════════════════════════════════
+async function loadPayables(){
+  if(!S.user)return;
+  const r=await sb(`/rest/v1/cuentas_pagar?negocio_id=eq.${S.user.nid}&order=vence_en.asc`);
+  const items=r.data||[];const now=new Date();
+  const pending=items.filter(p=>p.estado!=='pagada');
+  $('payPending').textContent=fmt(pending.reduce((s,p)=>s+parseFloat(p.monto||0),0));
+  $('payOverdue').textContent=items.filter(p=>p.estado!=='pagada'&&p.vence_en&&new Date(p.vence_en)<now).length;
+  const el=$('payablesList');
+  if(!items.length){el.innerHTML='<div class="empty-state"><div class="icon">💸</div><p>Sin cuentas</p></div>';return;}
+  el.innerHTML=items.map(p=>{
+    const ov=p.estado!=='pagada'&&p.vence_en&&new Date(p.vence_en)<now;
+    const sc=p.estado==='pagada'?'var(--green)':ov?'var(--red)':'var(--yellow)';
+    const sl=p.estado==='pagada'?'✅ Pagada':ov?'⚠ Vencida':'⏳ Pendiente';
+    return`<div class="data-item"><div class="d-icon" style="background:var(--ybg)">💸</div><div class="d-info"><div class="d-title">${esc(p.proveedor||'Sin proveedor')}</div><div class="d-sub">${esc(p.descripcion||'')} · ${fmtD(p.vence_en)} · <span style="color:${sc}">${sl}</span></div></div><div class="d-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><div class="d-amount">${fmt(p.monto)}</div>${p.estado!=='pagada'?`<button class="btn btn-success btn-sm" data-pid="${p.id}" data-a="paypay">💰 Pagar</button>`:''}</div></div>`;
+  }).join('');
+}
+
+function showPayableForm(){
+  openModal('Nueva Cuenta por Pagar',`
+    <div class="form-group"><label>Proveedor *</label><input type="text" id="pyS" placeholder="Proveedor"></div>
+    <div class="form-group"><label>Descripción</label><input type="text" id="pyD" placeholder="Factura mayo"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Monto *</label><input type="number" id="pyA" placeholder="0" min="0"></div>
+      <div class="form-group"><label>Vencimiento</label><input type="date" id="pyDt"></div>
+    </div>`,
+  `<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+   <button class="btn btn-primary" onclick="savePayable()">💾 Guardar</button>`);
+}
+
+async function savePayable(){
+  const supp=$('pyS').value.trim(),amt=parseFloat($('pyA').value)||0;
+  if(!supp||!amt){toast('Proveedor y monto requeridos','warn');return;}
+  showLoad();
+  const r=await sb('/rest/v1/cuentas_pagar',{method:'POST',body:JSON.stringify({
+    negocio_id:S.user.nid,proveedor:supp,
+    descripcion:$('pyD').value.trim(),
+    monto:amt,vence_en:$('pyDt').value||null
+  })});
+  hideLoad();
+  if(r.ok){toast('Registrado','success');closeModal();loadPayables();}
+  else toast('Error','error');
+}
+
+async function payPayable(id){
+  if(!confirm('¿Marcar como pagada?'))return;
+  showLoad();
+  await sb(`/rest/v1/cuentas_pagar?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({estado:'pagada'})});
+  hideLoad();toast('Pagada','success');loadPayables();
+}
+
 // Globals for inline onclick
 window.closeModal=closeModal;window.sendEmailViaWorker=sendEmailViaWorker;window.setMainImg=setMainImg;window.removeGalleryImg=removeGalleryImg;window.addImgFromUrl=addImgFromUrl;window.addVarGroup=addVarGroup;window.addVarValue=addVarValue;window.catVarPickSel=catVarPickSel;window.showAddDev=showAddDev;window.saveDevolution=saveDevolution;window.shareRec=shareRec;window.catQty=catQty;window.saveCFMove=saveCFMove;window.doPayDebt=doPayDebt;window.savePayable=savePayable;window.saveClient=saveClient;window.saveProd=saveProd;window.saveEntry=saveEntry;window.saveUser=saveUser;window.saveDebt=saveDebt;window.savePurchase=savePurchase;window.sendOrder=sendOrder;window.copyTxt=copyTxt;window.shareWA=shareWA;window.runImport=runImport;
 </script>
