@@ -1380,10 +1380,29 @@ body.app-active footer.site-footer{
 
       <!-- PURCHASES -->
       <section class="section" id="sec-purchases">
-        <div class="sec-hd"><h2>Compras</h2><button class="btn btn-primary btn-sm" id="addPurchaseBtn">+ Compra</button></div>
-        <div class="stats-grid" style="grid-template-columns:1fr 1fr">
+        <div class="sec-hd">
+          <h2>Compras</h2>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick="showProveedorManager()">🏭 Proveedores</button>
+            <button class="btn btn-primary btn-sm" id="addPurchaseBtn">+ Nueva Compra</button>
+          </div>
+        </div>
+        <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
           <div class="stat-card"><div class="stat-label">Este mes</div><div class="stat-value accent" id="purMonth">$0</div></div>
-          <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value blue" id="purCount">0</div></div>
+          <div class="stat-card"><div class="stat-label">Compras</div><div class="stat-value blue" id="purCount">0</div></div>
+          <div class="stat-card"><div class="stat-label">Proveedores</div><div class="stat-value green" id="purProvCount">0</div></div>
+        </div>
+        <!-- Filtro por proveedor -->
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <select id="purProvFilter" onchange="loadPurchases()" style="flex:1;min-width:140px;padding:7px 10px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:12px;outline:none">
+            <option value="">Todos los proveedores</option>
+          </select>
+          <select id="purStatusFilter" onchange="loadPurchases()" style="padding:7px 10px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:12px;outline:none">
+            <option value="">Todos los estados</option>
+            <option value="completada">Completada</option>
+            <option value="credito">Al crédito</option>
+            <option value="anulada">Anulada</option>
+          </select>
         </div>
         <div id="purchasesList" class="data-list"></div>
       </section>
@@ -2556,54 +2575,545 @@ async function saveDebt(){
   hideLoad();toast('Registrado','success');closeModal();loadDebts();
 }
 
-// PURCHASES
+// ═══════════════════════════════════════════════════
+// MÓDULO COMPRAS v2 — Proveedores + Catálogo + Detalle
+// ═══════════════════════════════════════════════════
+
+// ── State ────────────────────────────────────────────────────────────────
+let _proveedores = [];
+let _purchDraft  = []; // líneas del borrador de compra actual
+
+// ── Load proveedores ──────────────────────────────────────────────────────
+async function loadProveedores(){
+  if(!S.user) return [];
+  const r = await sb(`/rest/v1/proveedores?negocio_id=eq.${S.user.nid}&activo=eq.true&order=nombre.asc`);
+  _proveedores = r.ok ? (r.data||[]) : [];
+  // Update filter select
+  const sel = document.getElementById('purProvFilter');
+  if(sel){
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Todos los proveedores</option>' +
+      _proveedores.map(p=>`<option value="${p.id}"${cur===p.id?' selected':''}>${esc(p.nombre)}</option>`).join('');
+  }
+  const cnt = document.getElementById('purProvCount');
+  if(cnt) cnt.textContent = _proveedores.length;
+  return _proveedores;
+}
+
+// ── Load purchases (resumen) ──────────────────────────────────────────────
 async function loadPurchases(){
-  if(!S.user)return;
-  const r=await sb(`/rest/v1/compras?negocio_id=eq.${S.user.nid}&order=created_at.desc&limit=50`);
-  const items=r.data||[];const mo=new Date().toISOString().slice(0,7);
-  $('purMonth').textContent=fmt(items.filter(p=>p.created_at.slice(0,7)===mo).reduce((s,p)=>s+parseFloat(p.total||0),0));
-  $('purCount').textContent=items.length;
-  const el=$('purchasesList');
-  if(!items.length){el.innerHTML='<div class="empty-state"><div class="icon">🏪</div><p>Sin compras</p></div>';return;}
-  el.innerHTML=items.map(p=>`<div class="data-item"><div class="d-icon" style="background:var(--bbg)">📦</div><div class="d-info"><div class="d-title">${esc(p.nombre_prod||'')}</div><div class="d-sub">${fmtD(p.created_at)} · ${esc(p.proveedor||'')} · ${p.cantidad} uds</div></div><div class="d-right"><div class="d-amount red">${fmt(p.total)}</div></div></div>`).join('');
+  if(!S.user) return;
+  await loadProveedores();
+  const provId = document.getElementById('purProvFilter')?.value||'';
+  const status = document.getElementById('purStatusFilter')?.value||'';
+  let url = `/rest/v1/compras_v2?negocio_id=eq.${S.user.nid}&order=created_at.desc&limit=80`;
+  if(provId) url += `&proveedor_id=eq.${provId}`;
+  if(status) url += `&estado=eq.${status}`;
+  const r = await sb(url);
+  const items = r.data||[];
+  const mo = new Date().toISOString().slice(0,7);
+  const monthTotal = items.filter(c=>c.created_at?.slice(0,7)===mo).reduce((s,c)=>s+parseFloat(c.total||0),0);
+  const el = $('purMonth'); if(el) el.textContent = fmt(monthTotal);
+  const ec = $('purCount'); if(ec) ec.textContent = items.length;
+  renderPurchasesList(items);
+  // Also load legacy compras for backwards compat
 }
 
-function showPurchForm(){
-  const opts='<option value="">Seleccionar</option><option value="NEW">+ Crear nuevo</option>'+S.products.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
-  openModal('Nueva Compra',`<div class="form-group"><label>Producto *</label><select id="puP">${opts}</select></div><div id="puNN" class="form-group hidden"><label>Nombre nuevo producto</label><input type="text" id="puPN" placeholder="Nombre"></div><div class="form-row"><div class="form-group"><label>Cantidad *</label><input type="number" id="puQ" value="1" min="1"></div><div class="form-group"><label>Precio unit.</label><input type="number" id="puPr" placeholder="0" min="0"></div></div><div class="form-group"><label>Proveedor</label><input type="text" id="puSu" placeholder="Proveedor"></div>`,
-  `<button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="savePurchase()">💾 Registrar</button>`);
-  $('puP').addEventListener('change',()=>$('puNN').classList.toggle('hidden',$('puP').value!=='NEW'));
+function renderPurchasesList(items){
+  const el = $('purchasesList');
+  if(!items.length){
+    el.innerHTML='<div class="empty-state"><div class="icon">🏪</div><p>Sin compras registradas</p></div>';
+    return;
+  }
+  el.innerHTML = items.map(c=>{
+    const stColor = c.estado==='anulada'?'var(--red)':c.estado==='credito'?'var(--yellow)':'var(--green)';
+    const stLabel = c.estado==='anulada'?'Anulada':c.estado==='credito'?'Al crédito':'Completada';
+    return`<div class="data-item" style="cursor:pointer" onclick="showPurchaseDetail('${c.id}')">
+      <div class="d-icon" style="background:var(--bbg)">🧾</div>
+      <div class="d-info">
+        <div class="d-title">${esc(c.proveedor_nombre||'Sin proveedor')}
+          ${c.numero_doc?`<span style="font-size:10px;color:var(--text3);margin-left:6px">${esc(c.numero_doc)}</span>`:''}
+        </div>
+        <div class="d-sub">${fmtD(c.fecha||c.created_at)} · ${esc(c.tipo_doc||'factura')} · <span style="color:${stColor};font-weight:700">${stLabel}</span></div>
+      </div>
+      <div class="d-right">
+        <div class="d-amount red">${fmt(c.total)}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">${c.estado==='credito'?'💳 Crédito':''}</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
+// ── Purchase detail modal ─────────────────────────────────────────────────
+async function showPurchaseDetail(id){
+  showLoad();
+  const [hR, dR] = await Promise.all([
+    sb(`/rest/v1/compras_v2?id=eq.${id}`),
+    sb(`/rest/v1/compra_detalle?compra_id=eq.${id}&order=id.asc`)
+  ]);
+  hideLoad();
+  const h = hR.data?.[0]; if(!h) return;
+  const lines = dR.data||[];
+  openModal(`🧾 Compra — ${esc(h.proveedor_nombre||'Sin proveedor')}`,`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <div style="background:var(--surface);border-radius:var(--r);padding:10px">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:3px">PROVEEDOR</div>
+        <div style="font-weight:700">${esc(h.proveedor_nombre||'—')}</div>
+      </div>
+      <div style="background:var(--surface);border-radius:var(--r);padding:10px">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:3px">FECHA</div>
+        <div style="font-weight:700">${fmtD(h.fecha||h.created_at)}</div>
+      </div>
+      <div style="background:var(--surface);border-radius:var(--r);padding:10px">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:3px">DOCUMENTO</div>
+        <div style="font-weight:700">${esc(h.numero_doc||'—')} <span style="color:var(--text3);font-size:11px">${esc(h.tipo_doc||'')}</span></div>
+      </div>
+      <div style="background:var(--surface);border-radius:var(--r);padding:10px">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:3px">ESTADO</div>
+        <div style="font-weight:700;color:${h.estado==='credito'?'var(--yellow)':h.estado==='anulada'?'var(--red)':'var(--green)'}">${h.estado==='credito'?'Al crédito':h.estado==='anulada'?'Anulada':'Completada'}</div>
+      </div>
+    </div>
+    <!-- Líneas -->
+    <div style="border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:12px">
+      <div style="display:grid;grid-template-columns:1fr 70px 90px 90px;gap:0;background:var(--surface);padding:8px 12px;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase">
+        <div>Producto</div><div style="text-align:right">Cant.</div><div style="text-align:right">P. Unit.</div><div style="text-align:right">Subtotal</div>
+      </div>
+      ${lines.map(l=>`
+        <div style="display:grid;grid-template-columns:1fr 70px 90px 90px;gap:0;padding:9px 12px;border-top:1px solid var(--border);font-size:13px">
+          <div style="font-weight:600">${esc(l.nombre_producto)}</div>
+          <div style="text-align:right;color:var(--text2)">${l.cantidad}</div>
+          <div style="text-align:right;font-family:var(--mono)">${fmt(l.precio_unitario)}</div>
+          <div style="text-align:right;font-family:var(--mono);font-weight:700">${fmt(l.subtotal_linea)}</div>
+        </div>`).join('')}
+      <div style="display:grid;grid-template-columns:1fr 90px;padding:10px 12px;border-top:2px solid var(--border2);background:var(--surface)">
+        <div style="font-weight:800">TOTAL</div>
+        <div style="text-align:right;font-family:var(--mono);font-weight:800;font-size:16px;color:var(--accent2)">${fmt(h.total)}</div>
+      </div>
+    </div>
+    ${h.observaciones?`<div style="font-size:12px;color:var(--text2);padding:8px 10px;background:var(--surface);border-radius:var(--r)">📝 ${esc(h.observaciones)}</div>`:''}`,
+  `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>${h.estado!=='anulada'?`<button class="btn btn-danger btn-sm" onclick="anularCompra('${h.id}')">Anular</button>`:''}`);
+}
+
+async function anularCompra(id){
+  if(!confirm('¿Anular esta compra? El stock no se revertirá automáticamente.')) return;
+  showLoad();
+  await sb(`/rest/v1/compras_v2?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({estado:'anulada'})});
+  hideLoad();
+  toast('Compra anulada','warn');
+  closeModal();
+  loadPurchases();
+}
+
+// ── Show purchase form ────────────────────────────────────────────────────
+async function showPurchForm(){
+  await loadProveedores();
+  _purchDraft = [];
+
+  const provOpts = `<option value="">— Seleccionar proveedor —</option>` +
+    _proveedores.map(p=>`<option value="${p.id}" data-n="${esc(p.nombre)}">${esc(p.nombre)}</option>`).join('') +
+    `<option value="__new__">+ Nuevo proveedor...</option>`;
+
+  openModal('🧾 Nueva Compra',`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div class="form-group" style="margin:0">
+        <label>Proveedor *</label>
+        <select id="purchProvId" onchange="onPurchProvChange(this)" style="width:100%;padding:9px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
+          ${provOpts}
+        </select>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Fecha</label>
+        <input type="date" id="purchFecha" value="${new Date().toISOString().slice(0,10)}" style="width:100%;padding:9px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Tipo documento</label>
+        <select id="purchTipoDoc" style="width:100%;padding:9px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
+          <option value="factura">Factura</option>
+          <option value="boleta">Boleta</option>
+          <option value="guia">Guía despacho</option>
+          <option value="otro">Otro</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>N° Documento</label>
+        <input type="text" id="purchNumDoc" placeholder="Ej: 001234" style="width:100%;padding:9px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
+      </div>
+    </div>
+    <!-- Nuevo proveedor (hidden) -->
+    <div id="newProvRow" style="display:none;background:var(--surface);border-radius:var(--r);padding:10px;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">NUEVO PROVEEDOR</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <input type="text" id="newProvNombre" placeholder="Nombre *" style="flex:2;min-width:120px;padding:7px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px">
+        <input type="text" id="newProvTel" placeholder="Teléfono" style="flex:1;min-width:100px;padding:7px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px">
+        <input type="text" id="newProvRut" placeholder="RUT" style="flex:1;min-width:80px;padding:7px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px">
+      </div>
+    </div>
+    <!-- Catálogo del proveedor + búsqueda -->
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Agregar productos</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <input type="text" id="purchProdSearch" placeholder="Buscar producto del inventario..." oninput="renderPurchProdSearch(this.value)"
+          style="flex:1;padding:8px 10px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
+      </div>
+      <div id="purchProvCat" style="margin-bottom:8px"></div>
+      <div id="purchProdResults" style="max-height:160px;overflow-y:auto"></div>
+    </div>
+    <!-- Borrador de compra -->
+    <div style="border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;margin-bottom:10px">
+      <div style="background:var(--surface);padding:8px 12px;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase">Productos en esta compra</div>
+      <div id="purchDraftLines" style="min-height:40px"></div>
+      <div style="display:flex;justify-content:space-between;padding:10px 12px;border-top:1px solid var(--border);background:var(--surface)">
+        <span style="font-weight:700">Total</span>
+        <span id="purchDraftTotal" style="font-family:var(--mono);font-weight:800;font-size:16px;color:var(--accent2)">$0</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="form-group" style="margin:0">
+        <label>Estado</label>
+        <select id="purchEstado" style="width:100%;padding:9px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
+          <option value="completada">✅ Completada</option>
+          <option value="credito">💳 Al crédito</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Descuento %</label>
+        <input type="number" id="purchDesc" value="0" min="0" max="100" oninput="updatePurchTotal()" style="width:100%;padding:9px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
+      </div>
+    </div>
+    <div class="form-group" style="margin-top:8px">
+      <label>Observaciones</label>
+      <input type="text" id="purchObs" placeholder="Notas opcionales..." style="width:100%;padding:9px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
+    </div>`,
+  `<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+   <button class="btn btn-primary" onclick="savePurchase()">💾 Registrar compra</button>`);
+
+  // Load provider catalog after modal opens
+  setTimeout(()=>renderPurchProvCat(''), 100);
+}
+
+// ── On proveedor change ───────────────────────────────────────────────────
+async function onPurchProvChange(sel){
+  const newProvRow = document.getElementById('newProvRow');
+  if(sel.value === '__new__'){
+    if(newProvRow) newProvRow.style.display = 'block';
+    return;
+  }
+  if(newProvRow) newProvRow.style.display = 'none';
+  if(sel.value) await renderPurchProvCat(sel.value);
+  else renderPurchProvCat('');
+}
+
+async function renderPurchProvCat(provId){
+  const el = document.getElementById('purchProvCat');
+  if(!el) return;
+  if(!provId){ el.innerHTML='<div style="font-size:12px;color:var(--text3)">Selecciona un proveedor para ver su catálogo</div>'; return; }
+  // Load proveedor_productos for this proveedor
+  const r = await sb(`/rest/v1/proveedor_productos?proveedor_id=eq.${provId}&negocio_id=eq.${S.user.nid}&activo=eq.true&select=*,productos(id,nombre,stock,precio_costo)`);
+  const items = r.data||[];
+  if(!items.length){
+    el.innerHTML='<div style="font-size:12px;color:var(--text3);padding:8px 0">Sin productos asociados a este proveedor aún. Busca productos abajo.</div>';
+    return;
+  }
+  el.innerHTML = `<div style="font-size:11px;font-weight:700;color:var(--accent2);margin-bottom:6px">📦 Catálogo del proveedor (${items.length})</div>` +
+    `<div style="display:flex;flex-wrap:wrap;gap:6px">` +
+    items.map(pp=>{
+      const p = pp.productos||{};
+      const inDraft = _purchDraft.find(d=>d.pid===p.id);
+      return`<div onclick="addPurchLine('${p.id}','${esc(p.nombre||'')}',${pp.ultimo_precio||pp.precio_ref||0})"
+        style="background:${inDraft?'var(--accent-glow)':'var(--surface)'};border:1.5px solid ${inDraft?'var(--accent)':'var(--border2)'};
+        border-radius:var(--r);padding:7px 10px;cursor:pointer;font-size:12px;transition:all 0.15s">
+        <div style="font-weight:600">${esc(p.nombre||'')}</div>
+        <div style="font-size:10px;color:var(--text3)">Stock: ${p.stock||0} · Últ: ${fmt(pp.ultimo_precio||0)}</div>
+      </div>`;
+    }).join('') + `</div>`;
+}
+
+function renderPurchProdSearch(q){
+  const el = document.getElementById('purchProdResults');
+  if(!el) return;
+  if(!q||q.length<2){ el.innerHTML=''; return; }
+  const ql = q.toLowerCase();
+  const results = S.products.filter(p=>p.name.toLowerCase().includes(ql)||(p.code||'').includes(ql)).slice(0,8);
+  if(!results.length){ el.innerHTML='<div style="font-size:12px;color:var(--text3);padding:6px">Sin resultados</div>'; return; }
+  el.innerHTML = results.map(p=>`
+    <div onclick="addPurchLine('${p.id}','${esc(p.name)}',${p.cost||0})" style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--surface);border-radius:var(--r);margin-bottom:4px;cursor:pointer;font-size:12px;transition:background 0.1s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='var(--surface)'">
+      <div><div style="font-weight:600">${esc(p.name)}</div><div style="color:var(--text3)">Stock: ${p.stock} · Costo: ${fmt(p.cost)}</div></div>
+      <div style="color:var(--accent2);font-weight:700">+</div>
+    </div>`).join('');
+}
+
+function addPurchLine(pid, nombre, precioRef){
+  const existing = _purchDraft.findIndex(d=>d.pid===pid);
+  if(existing>=0){
+    _purchDraft[existing].qty++;
+    _purchDraft[existing].sub = _purchDraft[existing].qty * _purchDraft[existing].price;
+  } else {
+    _purchDraft.push({pid, nombre, price: precioRef||0, qty:1, sub: precioRef||0});
+  }
+  renderPurchDraft();
+  // Clear search
+  const srch = document.getElementById('purchProdSearch');
+  if(srch){ srch.value=''; document.getElementById('purchProdResults').innerHTML=''; }
+}
+
+function renderPurchDraft(){
+  const el = document.getElementById('purchDraftLines');
+  if(!el) return;
+  if(!_purchDraft.length){
+    el.innerHTML='<div style="padding:12px;text-align:center;font-size:12px;color:var(--text3)">Sin productos</div>';
+    updatePurchTotal(); return;
+  }
+  el.innerHTML = _purchDraft.map((l,i)=>`
+    <div style="display:grid;grid-template-columns:1fr 70px 100px 36px;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border)">
+      <div style="font-size:12px;font-weight:600">${esc(l.nombre)}</div>
+      <input type="number" value="${l.qty}" min="1" step="0.001" onchange="updPurchLine(${i},'qty',this.value)"
+        style="padding:5px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px;text-align:center;outline:none">
+      <input type="number" value="${l.price}" min="0" step="0.01" onchange="updPurchLine(${i},'price',this.value)"
+        style="padding:5px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px;text-align:right;font-family:var(--mono);outline:none">
+      <button onclick="removePurchLine(${i})" style="background:var(--red-bg);border:none;color:var(--red);border-radius:var(--r);cursor:pointer;font-size:14px;padding:4px 6px">✕</button>
+    </div>`).join('');
+  updatePurchTotal();
+}
+
+function updPurchLine(i,field,val){
+  if(field==='qty') _purchDraft[i].qty = parseFloat(val)||1;
+  if(field==='price') _purchDraft[i].price = parseFloat(val)||0;
+  _purchDraft[i].sub = _purchDraft[i].qty * _purchDraft[i].price;
+  updatePurchTotal();
+}
+
+function removePurchLine(i){
+  _purchDraft.splice(i,1);
+  renderPurchDraft();
+}
+
+function updatePurchTotal(){
+  const disc = parseFloat(document.getElementById('purchDesc')?.value)||0;
+  const sub = _purchDraft.reduce((s,l)=>s+l.sub,0);
+  const total = sub*(1-disc/100);
+  const el = document.getElementById('purchDraftTotal');
+  if(el) el.textContent = fmt(total);
+}
+
+// ── Save purchase ─────────────────────────────────────────────────────────
 async function savePurchase(){
-  const pid=$('puP').value,qty=parseInt($('puQ').value)||1,price=parseFloat($('puPr').value)||0,supp=$('puSu').value.trim();
-  if(!pid){toast('Selecciona producto','warn');return;}
+  if(!_purchDraft.length){toast('Agrega al menos un producto','warn');return;}
+  const provSel = document.getElementById('purchProvId');
+  let provId = provSel?.value||'';
+  let provNombre = provSel?.options[provSel.selectedIndex]?.dataset?.n||'';
+
+  // Create new proveedor if needed
+  if(provId==='__new__'){
+    const nombre = document.getElementById('newProvNombre')?.value.trim();
+    if(!nombre){toast('Ingresa el nombre del proveedor','warn');return;}
+    showLoad();
+    const pr = await sb('/rest/v1/proveedores',{method:'POST',body:JSON.stringify({
+      negocio_id:S.user.nid, nombre,
+      telefono: document.getElementById('newProvTel')?.value.trim()||'',
+      rut: document.getElementById('newProvRut')?.value.trim()||'',
+      activo: true
+    })});
+    if(!pr.ok){toast('Error al crear proveedor','error');hideLoad();return;}
+    provId = pr.data[0].id;
+    provNombre = nombre;
+  }
+
+  const disc = parseFloat(document.getElementById('purchDesc')?.value)||0;
+  const sub = _purchDraft.reduce((s,l)=>s+l.sub,0);
+  const total = sub*(1-disc/100);
+
   showLoad();
   try{
-    let productId=pid,productName='';
-    if(pid==='NEW'){const name=$('puPN').value.trim();if(!name){toast('Nombre requerido','warn');hideLoad();return;}const r=await sb('/rest/v1/productos',{method:'POST',body:JSON.stringify({negocio_id:S.user.nid,nombre:name,stock:qty,precio_costo:price})});if(!r.ok){toast('Error','error');hideLoad();return;}productId=r.data[0].id;productName=name;}
-    else{const p=S.products.find(p=>p.id===pid);productName=p?p.name:'';const pr=await sb(`/rest/v1/productos?id=eq.${pid}&select=stock`);if(pr.data&&pr.data[0])await sb(`/rest/v1/productos?id=eq.${pid}`,{method:'PATCH',body:JSON.stringify({stock:pr.data[0].stock+qty})});}
-    await sb('/rest/v1/compras',{method:'POST',body:JSON.stringify({negocio_id:S.user.nid,producto_id:productId,nombre_prod:productName,cantidad:qty,precio:price,total:price*qty,proveedor:supp,usuario_id:S.user.id})});
-    toast('Registrado','success');closeModal();await loadProds();loadPurchases();
-  }finally{hideLoad();}
+    // 1. Create header
+    const hR = await sb('/rest/v1/compras_v2',{method:'POST',body:JSON.stringify({
+      negocio_id: S.user.nid,
+      proveedor_id: provId||null,
+      proveedor_nombre: provNombre||'Sin proveedor',
+      fecha: document.getElementById('purchFecha')?.value||new Date().toISOString().slice(0,10),
+      numero_doc: document.getElementById('purchNumDoc')?.value.trim()||'',
+      tipo_doc: document.getElementById('purchTipoDoc')?.value||'factura',
+      subtotal: sub,
+      descuento: disc,
+      total,
+      estado: document.getElementById('purchEstado')?.value||'completada',
+      observaciones: document.getElementById('purchObs')?.value.trim()||'',
+      usuario_id: S.user.id
+    })});
+    if(!hR.ok) throw new Error('Error al crear compra');
+    const compraId = hR.data[0].id;
+
+    // 2. Insert detail lines + update stock
+    for(const l of _purchDraft){
+      await sb('/rest/v1/compra_detalle',{method:'POST',body:JSON.stringify({
+        compra_id: compraId,
+        negocio_id: S.user.nid,
+        producto_id: l.pid||null,
+        nombre_producto: l.nombre,
+        cantidad: l.qty,
+        precio_unitario: l.price,
+        subtotal_linea: l.sub
+      })});
+      // Update stock
+      if(l.pid){
+        const pr = await sb(`/rest/v1/productos?id=eq.${l.pid}&select=stock`);
+        if(pr.data?.[0]) await sb(`/rest/v1/productos?id=eq.${l.pid}`,{method:'PATCH',body:JSON.stringify({stock: (pr.data[0].stock||0) + l.qty, precio_costo: l.price})});
+        // Update proveedor_productos catalog
+        if(provId){
+          await sb('/rest/v1/proveedor_productos',{method:'POST',
+            headers:{'Prefer':'resolution=merge-duplicates'},
+            body:JSON.stringify({
+              negocio_id: S.user.nid,
+              proveedor_id: provId,
+              producto_id: l.pid,
+              ultimo_precio: l.price,
+              ultima_fecha: new Date().toISOString().slice(0,10),
+              activo: true
+            })
+          });
+        }
+      }
+    }
+
+    // 3. Cuentas por pagar if credito
+    if(document.getElementById('purchEstado')?.value==='credito' && provId){
+      await sb('/rest/v1/cuentas_pagar',{method:'POST',body:JSON.stringify({
+        negocio_id: S.user.nid,
+        proveedor: provNombre,
+        descripcion: `Compra ${document.getElementById('purchTipoDoc')?.value||''} ${document.getElementById('purchNumDoc')?.value||''}`.trim(),
+        monto: total,
+        estado: 'pendiente'
+      })});
+    }
+
+    toast('✓ Compra registrada','success');
+    closeModal();
+    await loadProds();
+    loadPurchases();
+  }catch(e){
+    toast('Error: '+e.message,'error');
+  }finally{
+    hideLoad();
+  }
 }
 
-// PAYABLES
-async function loadPayables(){
-  if(!S.user)return;
-  const r=await sb(`/rest/v1/cuentas_pagar?negocio_id=eq.${S.user.nid}&order=vence_en.asc`);
-  const items=r.data||[];const now=new Date();
-  const pending=items.filter(p=>p.estado!=='pagada');
-  $('payPending').textContent=fmt(pending.reduce((s,p)=>s+parseFloat(p.monto||0),0));
-  $('payOverdue').textContent=items.filter(p=>p.estado!=='pagada'&&p.vence_en&&new Date(p.vence_en)<now).length;
-  const el=$('payablesList');
-  if(!items.length){el.innerHTML='<div class="empty-state"><div class="icon">💸</div><p>Sin cuentas</p></div>';return;}
-  el.innerHTML=items.map(p=>{const ov=p.estado!=='pagada'&&p.vence_en&&new Date(p.vence_en)<now;const sc=p.estado==='pagada'?'var(--green)':ov?'var(--red)':'var(--yellow)';const sl=p.estado==='pagada'?'✅ Pagada':ov?'⚠ Vencida':'⏳ Pendiente';return`<div class="data-item"><div class="d-icon" style="background:var(--ybg)">💸</div><div class="d-info"><div class="d-title">${esc(p.proveedor||'Sin proveedor')}</div><div class="d-sub">${esc(p.descripcion||'')} · ${fmtD(p.vence_en)} · <span style="color:${sc}">${sl}</span></div></div><div class="d-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><div class="d-amount">${fmt(p.monto)}</div>${p.estado!=='pagada'?`<button class="btn btn-success btn-sm" data-pid="${p.id}" data-a="paypay">💰 Pagar</button>`:''}</div></div>`;}).join('');
+// ── Proveedor manager ─────────────────────────────────────────────────────
+async function showProveedorManager(){
+  await loadProveedores();
+  openModal('🏭 Proveedores',`
+    <div style="margin-bottom:10px;text-align:right">
+      <button class="btn btn-primary btn-sm" onclick="showNewProveedorForm()">+ Nuevo proveedor</button>
+    </div>
+    <div class="data-list" id="proveedoresList">
+      ${_proveedores.map(p=>`
+        <div class="data-item">
+          <div class="d-icon" style="background:var(--bbg)">🏭</div>
+          <div class="d-info">
+            <div class="d-title">${esc(p.nombre)}</div>
+            <div class="d-sub">${esc(p.rut||'')}${p.rut&&p.telefono?' · ':''}${esc(p.telefono||'')}${p.contacto?' · '+esc(p.contacto):''}</div>
+          </div>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-outline btn-sm" onclick="showProveedorDetail('${p.id}')">Ver</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteProveedor('${p.id}','${esc(p.nombre)}')">🗑</button>
+          </div>
+        </div>`).join('') || '<div class="empty-state"><div class="icon">🏭</div><p>Sin proveedores registrados</p></div>'}
+    </div>`,
+  `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>`);
 }
 
-function showPayableForm(){
-  openModal('Nueva Cuenta por Pagar',`<div class="form-group"><label>Proveedor *</label><input type="text" id="pyS" placeholder="Proveedor"></div><div class="form-group"><label>Descripción</label><input type="text" id="pyD" placeholder="Factura mayo"></div><div class="form-row"><div class="form-group"><label>Monto *</label><input type="number" id="pyA" placeholder="0" min="0"></div><div class="form-group"><label>Vencimiento</label><input type="date" id="pyDt"></div></div>`,
-  `<button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="savePayable()">💾 Guardar</button>`);
+async function showNewProveedorForm(){
+  closeModal();
+  openModal('+ Nuevo Proveedor',`
+    <div class="form-group"><label>Nombre *</label><input type="text" id="npNombre" placeholder="Nombre del proveedor"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="form-group"><label>RUT</label><input type="text" id="npRut" placeholder="76.123.456-7"></div>
+      <div class="form-group"><label>Teléfono</label><input type="tel" id="npTel" placeholder="+56 9..."></div>
+    </div>
+    <div class="form-group"><label>Email</label><input type="email" id="npEmail" placeholder="proveedor@..."></div>
+    <div class="form-group"><label>Contacto</label><input type="text" id="npContact" placeholder="Nombre del contacto"></div>
+    <div class="form-group"><label>Dirección</label><input type="text" id="npDir" placeholder="Dirección"></div>
+    <div class="form-group"><label>Notas</label><textarea id="npNotes" rows="2"></textarea></div>`,
+  `<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+   <button class="btn btn-primary" onclick="saveProveedor()">💾 Guardar</button>`);
+}
+
+async function saveProveedor(){
+  const nombre = $('npNombre')?.value.trim();
+  if(!nombre){toast('Nombre requerido','warn');return;}
+  showLoad();
+  const r = await sb('/rest/v1/proveedores',{method:'POST',body:JSON.stringify({
+    negocio_id: S.user.nid, nombre,
+    rut: $('npRut')?.value.trim()||'',
+    telefono: $('npTel')?.value.trim()||'',
+    email: $('npEmail')?.value.trim()||'',
+    contacto: $('npContact')?.value.trim()||'',
+    direccion: $('npDir')?.value.trim()||'',
+    notas: $('npNotes')?.value.trim()||'',
+    activo: true
+  })});
+  hideLoad();
+  if(r.ok){toast('✓ Proveedor creado','success');closeModal();await showProveedorManager();}
+  else toast('Error al guardar','error');
+}
+
+async function showProveedorDetail(id){
+  showLoad();
+  const [pR, ppR, cR] = await Promise.all([
+    sb(`/rest/v1/proveedores?id=eq.${id}`),
+    sb(`/rest/v1/proveedor_productos?proveedor_id=eq.${id}&negocio_id=eq.${S.user.nid}&select=*,productos(nombre,stock)`),
+    sb(`/rest/v1/compras_v2?proveedor_id=eq.${id}&negocio_id=eq.${S.user.nid}&order=created_at.desc&limit=10`)
+  ]);
+  hideLoad();
+  const p = pR.data?.[0]; if(!p) return;
+  const prods = ppR.data||[];
+  const compras = cR.data||[];
+  const totalComprado = compras.reduce((s,c)=>s+parseFloat(c.total||0),0);
+
+  openModal(`🏭 ${esc(p.nombre)}`,`
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+      <div style="background:var(--surface);border-radius:var(--r);padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--text3)">COMPRAS</div>
+        <div style="font-size:20px;font-weight:800">${compras.length}</div>
+      </div>
+      <div style="background:var(--surface);border-radius:var(--r);padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--text3)">TOTAL</div>
+        <div style="font-family:var(--mono);font-size:15px;font-weight:800;color:var(--red)">${fmt(totalComprado)}</div>
+      </div>
+      <div style="background:var(--surface);border-radius:var(--r);padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--text3)">ÚLTIMA</div>
+        <div style="font-size:12px;font-weight:700">${compras[0]?fmtD(compras[0].fecha):'—'}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:6px">Catálogo (${prods.length} productos)</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+      ${prods.map(pp=>`
+        <div style="background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);padding:7px 10px;font-size:12px">
+          <div style="font-weight:600">${esc(pp.productos?.nombre||'')}</div>
+          <div style="font-size:10px;color:var(--text3)">Stock: ${pp.productos?.stock||0} · Últ: ${fmt(pp.ultimo_precio||0)} · ${pp.ultima_fecha?fmtD(pp.ultima_fecha):'—'}</div>
+        </div>`).join('') || '<span style="font-size:12px;color:var(--text3)">Sin productos asociados</span>'}
+    </div>
+    <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:6px">Historial de compras</div>
+    <div class="data-list">
+      ${compras.map(c=>`
+        <div class="data-item" style="cursor:pointer" onclick="showPurchaseDetail('${c.id}')">
+          <div class="d-icon" style="background:var(--bbg)">🧾</div>
+          <div class="d-info">
+            <div class="d-title">${fmtD(c.fecha||c.created_at)} ${c.numero_doc?'· '+esc(c.numero_doc):''}</div>
+            <div class="d-sub">${esc(c.tipo_doc||'')} · ${c.estado}</div>
+          </div>
+          <div class="d-amount red">${fmt(c.total)}</div>
+        </div>`).join('') || '<div class="empty-state" style="padding:12px"><p>Sin historial</p></div>'}
+    </div>`,
+  `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>
+   <button class="btn btn-primary btn-sm" onclick="closeModal();showPurchForm()">+ Nueva compra</button>`);
+}
+
+async function deleteProveedor(id, nombre){
+  if(!confirm(`¿Eliminar proveedor "${nombre}"? Sus compras se conservan.`)) return;
+  showLoad();
+  await sb(`/rest/v1/proveedores?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({activo:false})});
+  hideLoad();
+  toast('Proveedor eliminado','warn');
+  showProveedorManager();
 }
 
 async function savePayable(){
@@ -3110,7 +3620,7 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   $$('#devFilters .fpill').forEach(b=>b.addEventListener('click',()=>{$$('#devFilters .fpill').forEach(x=>x.classList.remove('active'));b.classList.add('active');devFilter=b.dataset.filter;loadDevolutions();}));
 
   // Purchases
-  $('addPurchaseBtn').addEventListener('click',showPurchForm);
+  $('addPurchaseBtn').addEventListener('click',()=>showPurchForm());
 
   // Payables
   $('addPayableBtn').addEventListener('click',showPayableForm);
