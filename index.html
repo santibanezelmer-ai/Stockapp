@@ -1777,12 +1777,15 @@ async function doLogin(){
   const u=$('loginUser').value.trim(),p=$('loginPass').value.trim();
   if(!u||!p){showAErr('loginErr','Completa todos los campos');return;}
 
-  // Rate limiting
+  // Rate limiting (suavizado: 10 intentos, 5 min)
   const lockKey='ox_lock_'+btoa(u).slice(0,12);
-  const lockData=JSON.parse(localStorage.getItem(lockKey)||'{"attempts":0,"lockedUntil":0}');
+  let lockData;try{lockData=JSON.parse(localStorage.getItem(lockKey)||'{"attempts":0,"lockedUntil":0}');}catch{lockData={attempts:0,lockedUntil:0};}
   if(lockData.lockedUntil>Date.now()){
-    const mins=Math.ceil((lockData.lockedUntil-Date.now())/60000);
-    showAErr('loginErr','Cuenta bloqueada. Intenta en '+mins+' minuto(s).');return;
+    // Allow bypass by clearing lock if > 1 min has passed since lock was set
+    if(Date.now()-lockData.lockedAt>60000){lockData={attempts:0,lockedUntil:0};localStorage.removeItem(lockKey);}
+    else{const mins=Math.ceil((lockData.lockedUntil-Date.now())/60000);showAErr('loginErr','Demasiados intentos. Espera '+mins+' min o recarga la página.');
+    $('loginUnlockHint')?.classList.remove('hidden');
+    return;}
   }
 
   showLoad();
@@ -1801,9 +1804,9 @@ async function doLogin(){
     }
     if(!r.ok||!r.data.length){
       lockData.attempts=(lockData.attempts||0)+1;
-      if(lockData.attempts>=5){lockData.lockedUntil=Date.now()+15*60*1000;lockData.attempts=0;}
+      if(lockData.attempts>=10){lockData.lockedUntil=Date.now()+5*60*1000;lockData.lockedAt=Date.now();lockData.attempts=0;}
       localStorage.setItem(lockKey,JSON.stringify(lockData));
-      const rem=Math.max(0,5-lockData.attempts);
+      const rem=Math.max(0,10-lockData.attempts);
       showAErr('loginErr','Credenciales incorrectas'+(rem>0?' · '+rem+' intentos restantes':''));
       hideLoad();return;
     }
@@ -1980,6 +1983,11 @@ async function startApp(){
     return;
   }
 
+  // Verify user has correct nid before starting
+  if(!S.user?.nid){
+    console.error('[OperixERP] startApp sin nid - volviendo al login');
+    return;
+  }
   // Normal app start
   $('loginScreen').classList.add('hidden');
   $('registerScreen').classList.add('hidden');
@@ -1994,6 +2002,14 @@ async function startApp(){
   applyBranding();
   await Promise.all([loadProds(),loadClients()]);
   showSec('dashboard');
+  // Debug: log current user context
+  console.log('[OperixERP] Session activa:',{
+    user: S.user?.login,
+    negocio: S.user?.bizName,
+    nid: S.user?.nid,
+    products: S.products?.length,
+    clients: S.clients?.length
+  });
   setDesktop(localStorage.getItem('ox_desktop')==='1');
   // Audit section added lazily when settings opens
   // FASE 4: keyboard shortcuts
@@ -6120,6 +6136,19 @@ addToCartWithVariant = function(p, varLabel){
   _origAddToCartWithVariant(p, varLabel);
 };
 
+
+function clearLoginLock(){
+  const u=$('loginUser').value.trim();
+  if(u){
+    const lockKey='ox_lock_'+btoa(u).slice(0,12);
+    localStorage.removeItem(lockKey);
+  }
+  // Also clear all ox_lock_ keys
+  Object.keys(localStorage).filter(k=>k.startsWith('ox_lock_')).forEach(k=>localStorage.removeItem(k));
+  $('loginErr').classList.add('hidden');
+  $('loginUnlockHint').classList.add('hidden');
+  toast('Bloqueo eliminado, puedes intentar nuevamente','success');
+}
 
 // Globals for inline onclick
 window.closeModal=closeModal;window.sendEmailViaWorker=sendEmailViaWorker;window.setMainImg=setMainImg;window.removeGalleryImg=removeGalleryImg;window.addImgFromUrl=addImgFromUrl;window.addVarGroup=addVarGroup;window.addVarValue=addVarValue;window.catVarPickSel=catVarPickSel;window.showAddDev=showAddDev;window.saveDevolution=saveDevolution;window.shareRec=shareRec;window.catQty=catQty;window.saveCFMove=saveCFMove;window.doPayDebt=doPayDebt;window.savePayable=savePayable;window.saveClient=saveClient;window.saveProd=saveProd;window.saveEntry=saveEntry;window.saveUser=saveUser;window.saveDebt=saveDebt;window.savePurchase=savePurchase;window.sendOrder=sendOrder;window.copyTxt=copyTxt;window.shareWA=shareWA;window.runImport=runImport;
