@@ -5479,15 +5479,16 @@ function showCatManager(){
           <div class="d-icon" style="background:var(--surface);font-size:16px">🏷</div>
           <div class="d-info">
             <div class="d-title">${esc(c)}</div>
-            <div class="d-sub">${counts[c]||0} productos</div>
+            <div class="d-sub">${counts[c]||0} producto${(counts[c]||0)===1?'':'s'}</div>
           </div>
           <div style="display:flex;gap:6px">
-            <button class="btn btn-outline btn-sm" onclick="renameCat('${esc(c)}')">✏️ Renombrar</button>
+            <button class="btn btn-outline btn-sm" onclick="renameCat('${esc(c)}')">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteCat('${esc(c)}')">🗑</button>
           </div>
         </div>`).join('')}
     </div>
     <div style="background:var(--surface);border-radius:var(--r);padding:12px">
-      <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em">Renombrar</div>
+      <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em">Renombrar categoría</div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         <input type="text" id="catFrom" placeholder="Nombre actual" style="flex:1;min-width:100px;padding:7px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px">
         <span style="color:var(--text3)">→</span>
@@ -5496,6 +5497,25 @@ function showCatManager(){
       </div>
     </div>`,
   `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>`);
+}
+
+async function deleteCat(cat){
+  const prods=S.products.filter(p=>p.cat===cat);
+  if(!confirm(`¿Eliminar categoría "${cat}"?
+${prods.length} producto(s) quedarán sin categoría.`))return;
+  showLoad();
+  let ok=0;
+  for(const p of prods){
+    const r=await sb(`/rest/v1/productos?id=eq.${p.id}`,{method:'PATCH',body:JSON.stringify({categoria:''})});
+    if(r.ok)ok++;
+  }
+  hideLoad();
+  toast(`✓ Categoría eliminada — ${ok} producto(s) sin clasificar`,'success');
+  await loadProds();
+  renderInv();
+  closeModal();
+  // Re-open manager with updated data
+  setTimeout(()=>showCatManager(),300);
 }
 
 function renameCat(name){
