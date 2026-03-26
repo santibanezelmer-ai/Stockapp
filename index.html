@@ -1060,8 +1060,8 @@ body.app-active footer.site-footer{
 
     <!-- STEP 1: Email -->
     <div id="loginStep1">
-      <div class="form-group"><label>Email</label><input type="email" id="loginUser" placeholder="tu@email.com" autocomplete="username"></div>
-      <div class="form-group"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"></div>
+      <div class="form-group"><label for="loginUser">Email</label><input type="email" id="loginUser" placeholder="tu@email.com" autocomplete="username"></div>
+      <div class="form-group"><label for="loginPass">Contraseña</label><input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"></div>
       <button class="btn btn-primary btn-lg" id="loginBtn">Iniciar Sesión</button>
       <div style="display:flex;align-items:center;gap:10px;margin:14px 0"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;color:var(--text3);font-weight:700">O INGRESA SIN CONTRASEÑA</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
       <button class="btn btn-outline btn-lg" id="sendOtpBtn">📧 Enviar código al email</button>
@@ -1083,7 +1083,7 @@ body.app-active footer.site-footer{
         <div style="font-size:13px;color:var(--text2)" id="otpEmailHint">Enviamos un código a tu email</div>
       </div>
       <div class="form-group">
-        <label>Código de 6 dígitos</label>
+        <label for="otpInput">Código de 6 dígitos</label>
         <input type="text" id="otpInput" placeholder="000000" maxlength="6" autocomplete="one-time-code"
           style="text-align:center;font-family:var(--mono);font-size:28px;font-weight:800;letter-spacing:0.15em">
       </div>
@@ -1112,10 +1112,10 @@ body.app-active footer.site-footer{
         <p>Crea tu negocio en segundos</p>
       </div>
       <div id="regErr" class="auth-err hidden"></div>
-      <div class="form-group"><label>Nombre del negocio *</label><input type="text" id="regBiz" placeholder="Minimarket Ana"></div>
-      <div class="form-group"><label>Tu nombre *</label><input type="text" id="regName" placeholder="Ana González"></div>
-      <div class="form-group"><label>Email *</label><input type="email" id="regEmail" placeholder="ana@email.com"></div>
-      <div class="form-group"><label>Contraseña *</label><input type="password" id="regPass" placeholder="Mínimo 6 caracteres"></div>
+      <div class="form-group"><label for="regBiz">Nombre del negocio *</label><input type="text" id="regBiz" placeholder="Minimarket Ana"></div>
+      <div class="form-group"><label for="regName">Tu nombre *</label><input type="text" id="regName" placeholder="Ana González"></div>
+      <div class="form-group"><label for="regEmail">Email *</label><input type="email" id="regEmail" placeholder="ana@email.com"></div>
+      <div class="form-group"><label for="regPass">Contraseña *</label><input type="password" id="regPass" placeholder="Mínimo 6 caracteres"></div>
       <button class="btn btn-primary btn-lg" id="regBtn">Continuar →</button>
       <p class="auth-legal">
         Al registrarte aceptas los
@@ -1135,7 +1135,7 @@ body.app-active footer.site-footer{
       </div>
       <div id="regErr2" class="auth-err hidden"></div>
       <div class="form-group">
-        <label>Código de verificación</label>
+        <label for="regOtpInput">Código de verificación</label>
         <input type="text" id="regOtpInput" placeholder="000000" maxlength="6" autocomplete="one-time-code"
           style="text-align:center;font-family:var(--mono);font-size:28px;font-weight:800;letter-spacing:0.15em">
       </div>
@@ -1165,7 +1165,7 @@ body.app-active footer.site-footer{
       </div>
       <div id="forgotErr" class="auth-err hidden"></div>
       <div class="form-group">
-        <label>Email de tu cuenta</label>
+        <label for="forgotEmail">Email de tu cuenta</label>
         <input type="email" id="forgotEmail" placeholder="tu@email.com" autocomplete="email">
       </div>
       <button class="btn btn-primary btn-lg" id="forgotSendBtn">📧 Enviar código</button>
@@ -1181,7 +1181,7 @@ body.app-active footer.site-footer{
       </div>
       <div id="forgotErr2" class="auth-err hidden"></div>
       <div class="form-group">
-        <label>Código de verificación</label>
+        <label for="forgotOtpInput">Código de verificación</label>
         <input type="text" id="forgotOtpInput" placeholder="000000" maxlength="6" autocomplete="one-time-code"
           style="text-align:center;font-family:var(--mono);font-size:28px;font-weight:800;letter-spacing:0.15em">
       </div>
@@ -1201,11 +1201,11 @@ body.app-active footer.site-footer{
       </div>
       <div id="forgotErr3" class="auth-err hidden"></div>
       <div class="form-group">
-        <label>Nueva contraseña *</label>
+        <label for="forgotNewPass">Nueva contraseña *</label>
         <input type="password" id="forgotNewPass" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
       </div>
       <div class="form-group">
-        <label>Confirmar contraseña *</label>
+        <label for="forgotConfirmPass">Confirmar contraseña *</label>
         <input type="password" id="forgotConfirmPass" placeholder="Repite la contraseña" autocomplete="new-password">
       </div>
       <button class="btn btn-primary btn-lg" id="forgotSaveBtn">🔒 Guardar nueva contraseña</button>
@@ -1566,18 +1566,18 @@ body.app-active footer.site-footer{
               <input type="url" id="logoUrlInp" class="hidden" placeholder="https://..." style="margin-top:8px;width:100%;padding:8px 12px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
             </div>
           </div>
-          <div class="form-group"><label>Nombre del negocio</label><input type="text" id="setBiz" placeholder="Mi Negocio"></div>
+          <div class="form-group"><label for="setBiz">Nombre del negocio</label><input type="text" id="setBiz" placeholder="Mi Negocio"></div>
           <div class="form-row">
-            <div class="form-group"><label>RUT</label><input type="text" id="setRut" placeholder="12.345.678-9"></div>
-            <div class="form-group"><label>Razón Social</label><input type="text" id="setRazon" placeholder="Empresa SpA"></div>
+            <div class="form-group"><label for="setRut">RUT</label><input type="text" id="setRut" placeholder="12.345.678-9"></div>
+            <div class="form-group"><label for="setRazon">Razón Social</label><input type="text" id="setRazon" placeholder="Empresa SpA"></div>
           </div>
-          <div class="form-group"><label>Teléfono / WhatsApp</label><input type="tel" id="setPhone" placeholder="+56 9..."></div>
+          <div class="form-group"><label for="setPhone">Teléfono / WhatsApp</label><input type="tel" id="setPhone" placeholder="+56 9..."></div>
           <button class="btn btn-primary btn-lg" id="saveBizBtn">💾 Guardar</button>
         </div>
         <div class="card">
           <div class="card-title">🎨 Apariencia</div>
           <div class="form-group">
-            <label>Color principal</label>
+            <label for="setColor">Color principal</label>
             <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
               <input type="color" id="setColor" value="#5B6EF5" style="width:48px;height:40px;padding:2px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);cursor:pointer">
               <span id="colorLabel" style="font-family:var(--mono);font-size:13px">#5B6EF5</span>
@@ -1596,13 +1596,13 @@ body.app-active footer.site-footer{
         <div class="card">
           <div class="card-title">💰 Finanzas</div>
           <div class="form-row">
-            <div class="form-group"><label>Moneda</label>
+            <div class="form-group"><label for="setMoneda">Moneda</label>
               <select id="setMoneda"><option value="CLP">🇨🇱 CLP</option><option value="USD">🇺🇸 USD</option><option value="EUR">🇪🇺 EUR</option><option value="PEN">🇵🇪 PEN</option><option value="ARS">🇦🇷 ARS</option><option value="MXN">🇲🇽 MXN</option><option value="COP">🇨🇴 COP</option></select>
             </div>
-            <div class="form-group"><label>Impuesto (%)</label><input type="number" id="setIva" placeholder="0" min="0" max="100" step="0.1"></div>
+            <div class="form-group"><label for="setIva">Impuesto (%)</label><input type="number" id="setIva" placeholder="0" min="0" max="100" step="0.1"></div>
           </div>
           <div class="form-group">
-            <label>Métodos de pago</label>
+            <label id="metodosLabel">Métodos de pago</label>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
               <label style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--bg2);border-radius:var(--r);cursor:pointer"><input type="checkbox" id="pm_efectivo" checked style="accent-color:var(--accent)"> 💵 Efectivo</label>
               <label style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--bg2);border-radius:var(--r);cursor:pointer"><input type="checkbox" id="pm_transferencia" checked style="accent-color:var(--accent)"> 📱 Transfer.</label>
@@ -1623,12 +1623,12 @@ body.app-active footer.site-footer{
         </div>
         <div class="card">
           <div class="card-title">🎯 Meta Diaria</div>
-          <div class="form-group"><label>Meta de ventas</label><input type="number" id="setGoal" placeholder="100000" min="0"></div>
+          <div class="form-group"><label for="setGoal">Meta de ventas</label><input type="number" id="setGoal" placeholder="100000" min="0"></div>
           <button class="btn btn-primary btn-lg" id="saveGoalBtn">💾 Guardar</button>
         </div>
         <div class="card">
           <div class="card-title">🔔 Alertas WhatsApp</div>
-          <div class="form-group"><label>Número</label><input type="tel" id="setAlertPhone" placeholder="+56 9..."></div>
+          <div class="form-group"><label for="setAlertPhone">Número</label><input type="tel" id="setAlertPhone" placeholder="+56 9..."></div>
           <div style="display:flex;gap:8px">
             <button class="btn btn-primary" style="flex:1" id="saveAlertBtn">💾 Guardar</button>
             <button class="btn btn-outline" style="flex:1" id="testAlertBtn">📲 Probar</button>
@@ -2349,18 +2349,18 @@ function showProdForm(p=null){
       <div class="form-group"><label>Proveedor</label><input type="text" id="pS" value="${esc(p?.supplier||'')}"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Precio Costo</label><input type="number" id="pCo" value="${p?.cost||''}" min="0" step="0.01"></div>
-      <div class="form-group"><label>Precio Venta *</label><input type="number" id="pP" value="${p?.price||''}" min="0" step="0.01"></div>
+      <div class="form-group"><label for="pCo">Precio Costo</label><input type="number" id="pCo" value="${p?.cost||''}" min="0" step="0.01"></div>
+      <div class="form-group"><label for="pP">Precio Venta *</label><input type="number" id="pP" value="${p?.price||''}" min="0" step="0.01"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Stock</label><input type="number" id="pSt" value="${p?.stock||0}" min="0"></div>
+      <div class="form-group"><label for="pSt">Stock</label><input type="number" id="pSt" value="${p?.stock||0}" min="0"></div>
       <div class="form-group"><label>Stock mínimo</label><input type="number" id="pMs" value="${p?.minStock||5}" min="0"></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label>Unidad de medida</label><select id="pU">${units.map(u=>`<option value="${u}"${p?.unit===u?' selected':''}>${u}</option>`).join('')}</select></div>
       <div class="form-group"><label>Cantidad mínima</label><input type="number" id="pMq" value="${p?.minQty||1}" min="0.01" step="0.01"></div>
     </div>
-    <div class="form-group"><label>Código de barras</label><input type="text" id="pBc" value="${esc(p?.code||'')}"></div>
+    <div class="form-group"><label for="pBc">Código de barras</label><input type="text" id="pBc" value="${esc(p?.code||'')}"></div>
   <label>Fotos del producto</label>
       <div id="pGallery" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;min-height:72px"></div>
       <input type="hidden" id="pIm" value="${esc(p?.img||'')}">
@@ -2551,7 +2551,7 @@ function renderClients(query){
 }
 
 function showClientForm(c=null){
-  openModal(c?'Editar Cliente':'Nuevo Cliente',`<div class="form-group"><label>Nombre *</label><input type="text" id="cN" value="${esc(c?.name||'')}"></div><div class="form-group"><label>Teléfono</label><input type="tel" id="cP" value="${esc(c?.phone||'')}"></div><div class="form-group"><label>Email</label><input type="email" id="cE" value="${esc(c?.email||'')}"></div><div class="form-group"><label>Dirección</label><input type="text" id="cA" value="${esc(c?.address||'')}"></div><div class="form-group"><label>Notas</label><textarea id="cNo" rows="2">${esc(c?.notes||'')}</textarea></div>`,
+  openModal(c?'Editar Cliente':'Nuevo Cliente',`<div class="form-group"><label for="cN">Nombre *</label><input type="text" id="cN" value="${esc(c?.name||'')}"></div><div class="form-group"><label for="cP">Teléfono</label><input type="tel" id="cP" value="${esc(c?.phone||'')}"></div><div class="form-group"><label for="cE">Email</label><input type="email" id="cE" value="${esc(c?.email||'')}"></div><div class="form-group"><label>Dirección</label><input type="text" id="cA" value="${esc(c?.address||'')}"></div><div class="form-group"><label>Notas</label><textarea id="cNo" rows="2">${esc(c?.notes||'')}</textarea></div>`,
   `<button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveClient('${c?.id||''}')">💾 Guardar</button>`);
 }
 
@@ -2760,17 +2760,17 @@ async function showPurchForm(){
   openModal('🧾 Nueva Compra',`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
       <div class="form-group" style="margin:0">
-        <label>Proveedor *</label>
+        <label for="purchProvId">Proveedor *</label>
         <select id="purchProvId" onchange="onPurchProvChange(this)" style="width:100%;padding:9px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
           ${provOpts}
         </select>
       </div>
       <div class="form-group" style="margin:0">
-        <label>Fecha</label>
+        <label for="purchFecha">Fecha</label>
         <input type="date" id="purchFecha" value="${new Date().toISOString().slice(0,10)}" style="width:100%;padding:9px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
       </div>
       <div class="form-group" style="margin:0">
-        <label>Tipo documento</label>
+        <label for="purchTipoDoc">Tipo documento</label>
         <select id="purchTipoDoc" style="width:100%;padding:9px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
           <option value="factura">Factura</option>
           <option value="boleta">Boleta</option>
@@ -2779,7 +2779,7 @@ async function showPurchForm(){
         </select>
       </div>
       <div class="form-group" style="margin:0">
-        <label>N° Documento</label>
+        <label for="purchNumDoc">N° Documento</label>
         <input type="text" id="purchNumDoc" placeholder="Ej: 001234" style="width:100%;padding:9px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
       </div>
     </div>
@@ -2813,19 +2813,19 @@ async function showPurchForm(){
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div class="form-group" style="margin:0">
-        <label>Estado</label>
+        <label for="purchEstado">Estado</label>
         <select id="purchEstado" style="width:100%;padding:9px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
           <option value="completada">✅ Completada</option>
           <option value="credito">💳 Al crédito</option>
         </select>
       </div>
       <div class="form-group" style="margin:0">
-        <label>Descuento %</label>
+        <label for="purchDesc">Descuento %</label>
         <input type="number" id="purchDesc" value="0" min="0" max="100" oninput="updatePurchTotal()" style="width:100%;padding:9px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
       </div>
     </div>
     <div class="form-group" style="margin-top:8px">
-      <label>Observaciones</label>
+      <label for="purchObs">Observaciones</label>
       <input type="text" id="purchObs" placeholder="Notas opcionales..." style="width:100%;padding:9px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;outline:none">
     </div>`,
   `<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
@@ -3460,7 +3460,7 @@ async function loadUsersList(){
 }
 
 function showAddUser(){
-  openModal('Agregar Usuario',`<div class="form-group"><label>Nombre *</label><input type="text" id="uN" placeholder="Juan Pérez"></div><div class="form-group"><label>Login / Email *</label><input type="text" id="uL" placeholder="juan@..."></div><div class="form-group"><label>Contraseña *</label><input type="password" id="uP" placeholder="Mínimo 6"></div><div class="form-group"><label>Rol</label><select id="uR"><option value="admin">Administrador</option><option value="vendedor" selected>Vendedor</option></select></div>`,
+  openModal('Agregar Usuario',`<div class="form-group"><label for="uN">Nombre *</label><input type="text" id="uN" placeholder="Juan Pérez"></div><div class="form-group"><label for="uL">Login / Email *</label><input type="text" id="uL" placeholder="juan@..."></div><div class="form-group"><label for="uP">Contraseña *</label><input type="password" id="uP" placeholder="Mínimo 6"></div><div class="form-group"><label>Rol</label><select id="uR"><option value="admin">Administrador</option><option value="vendedor" selected>Vendedor</option></select></div>`,
   `<button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveUser()">💾 Crear</button>`);
 }
 
