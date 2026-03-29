@@ -6729,7 +6729,8 @@ async function loadAjustesList(){
 }
 
 async function newAjuste(){
-  const nombre = `Conteo ${new Date().toLocaleDateString('es-CL')}`;
+  const nombre = prompt('Nombre del conteo:', `Conteo ${new Date().toLocaleDateString('es-CL')}`);
+  if(!nombre) return;
   showLoad();
   const testR = await sb(`/rest/v1/ajustes_inventario?negocio_id=eq.${S.user.nid}&limit=1`);
   if(!testR.ok){toast('Ejecuta el SQL del Sprint 1 en Supabase primero','error',4000);hideLoad();return;}
@@ -6750,49 +6751,111 @@ async function openAjuste(ajId){
   showLoad();
   const [ajR, linR] = await Promise.all([
     sb(`/rest/v1/ajustes_inventario?id=eq.${ajId}`),
-    sb(`/rest/v1/ajuste_lineas?ajuste_id=eq.${ajId}&select=*,productos(nombre)`)
+    sb(`/rest/v1/ajuste_lineas?ajuste_id=eq.${ajId}&select=*,productos(nombre,codigo)`)
   ]);
   hideLoad();
   const aj = ajR.data?.[0]; if(!aj) return;
   const lines = linR.data||[];
   const isDraft = aj.estado==='borrador';
+  const contadas = lines.filter(l=>l.stock_contado!==l.stock_sistema).length;
+  const diffs = lines.filter(l=>l.diferencia!==0).length;
+  const motivos = ['conteo','merma','robo','error_ingreso','otro'];
 
   openModal(`📋 ${esc(aj.nombre)}`,`
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div>
-        <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:100px;background:var(--surface);color:${aj.estado==='confirmado'?'var(--green)':aj.estado==='anulado'?'var(--red)':'var(--yellow)'}">
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:100px;background:var(--surface);
+          color:${aj.estado==='confirmado'?'var(--green)':aj.estado==='anulado'?'var(--red)':'var(--yellow)'}">
           ${aj.estado.toUpperCase()}
         </span>
-        <span style="font-size:12px;color:var(--text3);margin-left:8px">${fmtD(aj.fecha)}</span>
+        <span style="font-size:12px;color:var(--text3)">${fmtD(aj.fecha)}</span>
+        ${isDraft?`<button onclick="renameAjuste('${ajId}','${esc(aj.nombre)}')"
+          style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px">✏️</button>`:''}
       </div>
-      ${isDraft?`<button class="btn btn-outline btn-sm" onclick="addAjusteLine('${ajId}')">+ Agregar producto</button>`:''}
+      ${isDraft?`<div style="display:flex;gap:6px">
+        <button class="btn btn-outline btn-sm" onclick="agregarTodosProductos('${ajId}')">📦 Todos</button>
+        <button class="btn btn-outline btn-sm" onclick="addAjusteLine('${ajId}')">+ Producto</button>
+      </div>`:''}
     </div>
-    ${!lines.length?`<div class="empty-state"><div class="icon">📦</div><p>Sin líneas aún.<br><small>Agrega productos para contar.</small></p></div>`:`
-    <div style="border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:12px">
-      <div style="display:grid;grid-template-columns:1fr 80px 80px 70px 100px;gap:0;background:var(--surface);padding:8px 10px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">
-        <div>Producto</div><div style="text-align:right">Sistema</div><div style="text-align:right">Contado</div><div style="text-align:right">Dif.</div><div style="text-align:center">Motivo</div>
+
+    <!-- Progress -->
+    ${lines.length?`
+    <div style="background:var(--surface);border-radius:var(--r);padding:10px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:6px">
+        <span>${lines.length} productos · ${diffs} con diferencia</span>
+        <span style="color:${diffs>0?'var(--yellow)':'var(--green);font-weight:700'}">${diffs>0?`⚠ ${diffs} ajuste(s)`:'✓ Sin diferencias'}</span>
+      </div>
+      <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+        <div style="height:100%;width:${lines.length?Math.round((lines.length-diffs)/lines.length*100):0}%;background:var(--green);transition:width 0.3s"></div>
+      </div>
+    </div>`:''}
+
+    <!-- Líneas -->
+    ${!lines.length?`<div class="empty-state"><div class="icon">📦</div><p>Sin líneas.<br><small>Agrega productos individuales o usa "📦 Todos"</small></p></div>`:`
+    <div style="border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:10px;max-height:320px;overflow-y:auto">
+      <div style="display:grid;grid-template-columns:1fr 70px 80px 55px 90px ${isDraft?'24px':''};gap:0;
+        background:var(--surface);padding:8px 10px;font-size:10px;font-weight:700;color:var(--text3);
+        text-transform:uppercase;position:sticky;top:0;z-index:1">
+        <div>Producto</div>
+        <div style="text-align:right">Sistema</div>
+        <div style="text-align:right">Contado</div>
+        <div style="text-align:right">Dif.</div>
+        <div>Motivo</div>
+        ${isDraft?'<div></div>':''}
       </div>
       ${lines.map(l=>`
-        <div style="display:grid;grid-template-columns:1fr 80px 80px 70px 100px;gap:0;padding:9px 10px;border-top:1px solid var(--border);font-size:12px;align-items:center">
-          <div style="font-weight:600">${esc(l.productos?.nombre||'')}</div>
-          <div style="text-align:right;font-family:var(--mono)">${l.stock_sistema}</div>
+        <div style="display:grid;grid-template-columns:1fr 70px 80px 55px 90px ${isDraft?'24px':''};gap:0;
+          padding:8px 10px;border-top:1px solid var(--border);font-size:12px;align-items:center;
+          background:${l.diferencia!==0?'var(--ybg)':'transparent'};transition:background 0.15s">
+          <div>
+            <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.productos?.nombre||'')}</div>
+            ${l.productos?.codigo?`<div style="font-size:10px;color:var(--text3);font-family:var(--mono)">${esc(l.productos.codigo)}</div>`:''}
+          </div>
+          <div style="text-align:right;font-family:var(--mono);color:var(--text2)">${l.stock_sistema}</div>
           <div style="text-align:right">
             ${isDraft
-              ? `<input type="number" value="${l.stock_contado}" min="0" step="0.01"
-                   onchange="updateAjusteLine('${l.id}',this.value)"
-                   style="width:70px;padding:4px;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:12px;text-align:right;outline:none">`
-              : `<span style="font-family:var(--mono)">${l.stock_contado}</span>`}
+              ?`<input type="number" value="${l.stock_contado}" min="0" step="0.01"
+                  onchange="updateAjusteLine('${l.id}',this.value)"
+                  style="width:72px;padding:5px 6px;background:var(--bg2);border:1.5px solid ${l.diferencia!==0?'var(--yellow)':'var(--border2)'};
+                  border-radius:var(--r);color:var(--text);font-size:12px;text-align:right;outline:none;font-family:var(--mono)">`
+              :`<span style="font-family:var(--mono)">${l.stock_contado}</span>`}
           </div>
-          <div style="text-align:right;font-family:var(--mono);font-weight:700;color:${l.diferencia>0?'var(--green)':l.diferencia<0?'var(--red)':'var(--text3)'}">
-            ${l.diferencia>0?'+':''}${l.diferencia}
+          <div style="text-align:right;font-family:var(--mono);font-weight:800;
+            color:${l.diferencia>0?'var(--green)':l.diferencia<0?'var(--red)':'var(--text3)'}">
+            ${l.diferencia!==0?(l.diferencia>0?'+':'')+l.diferencia:'—'}
           </div>
-          <div style="text-align:center;font-size:10px;color:var(--text3)">${esc(l.motivo||'conteo')}</div>
+          <div>
+            ${isDraft
+              ?`<select onchange="updateAjusteLineMot('${l.id}',this.value)"
+                  style="width:100%;padding:4px;background:var(--bg2);border:1px solid var(--border2);
+                  border-radius:4px;color:var(--text);font-size:11px;outline:none">
+                  ${motivos.map(m=>`<option value="${m}"${l.motivo===m?' selected':''}>${m}</option>`).join('')}
+                </select>`
+              :`<span style="font-size:11px;color:var(--text3)">${esc(l.motivo||'conteo')}</span>`}
+          </div>
+          ${isDraft?`<div><button onclick="deleteAjusteLine('${l.id}','${ajId}')"
+            style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;
+            padding:2px;line-height:1" title="Eliminar">✕</button></div>`:''}
         </div>`).join('')}
     </div>`}
-    ${aj.notas?`<div style="font-size:12px;color:var(--text2);padding:8px;background:var(--surface);border-radius:var(--r)">📝 ${esc(aj.notas)}</div>`:''}`,
-    `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>
-     ${isDraft&&lines.length?`<button class="btn btn-primary" onclick="confirmarAjuste('${ajId}')">✅ Confirmar ajuste</button>`:''}
-     ${isDraft?`<button class="btn btn-danger btn-sm" onclick="anularAjuste('${ajId}')">Anular</button>`:''}`
+
+    <!-- Notas -->
+    ${isDraft?`
+    <div class="form-group" style="margin:0">
+      <label for="ajNotas" style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase">Notas</label>
+      <div style="display:flex;gap:6px">
+        <input type="text" id="ajNotas" value="${esc(aj.notas||'')}" placeholder="Observaciones del conteo..."
+          style="flex:1;padding:8px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px;outline:none">
+        <button class="btn btn-ghost btn-sm" onclick="saveAjusteNotas('${ajId}',$('ajNotas').value)">💾</button>
+      </div>
+    </div>`
+    :aj.notas?`<div style="font-size:12px;color:var(--text2);padding:8px 10px;background:var(--surface);border-radius:var(--r)">📝 ${esc(aj.notas)}</div>`:''}`,
+
+  `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>
+   <button class="btn btn-outline btn-sm" onclick="exportAjuste('${ajId}','${esc(aj.nombre)}')">📤 CSV</button>
+   ${isDraft&&lines.length?`<button class="btn btn-primary" onclick="previewConfirmAjuste('${ajId}')">✅ Confirmar</button>`:''}
+   ${isDraft?`<button class="btn btn-danger btn-sm" onclick="anularAjuste('${ajId}')">Anular</button>`:''}`
   );
 }
 
@@ -6988,6 +7051,144 @@ async function loadOpDash(){
         </div>`;
       }).join('')}
     </div>`}`;
+}
+
+// ═══════════════════════════════════════════════════
+// SPRINT 2 — AJUSTES DE INVENTARIO MEJORADO
+// ═══════════════════════════════════════════════════
+
+// ── Conteo masivo: agregar todos los productos ─────────────────────────
+async function agregarTodosProductos(ajId){
+  if(!confirm(`¿Agregar todos los productos (${S.products.length}) al conteo?`)) return;
+  showLoad();
+  let added = 0;
+  // Load existing lines to avoid duplicates
+  const existR = await sb(`/rest/v1/ajuste_lineas?ajuste_id=eq.${ajId}&select=producto_id`);
+  const existing = new Set((existR.data||[]).map(l=>l.producto_id));
+
+  const toAdd = S.products.filter(p=>!existing.has(p.id));
+  for(const p of toAdd){
+    await sb('/rest/v1/ajuste_lineas',{method:'POST',body:JSON.stringify({
+      ajuste_id: ajId,
+      negocio_id: S.user.nid,
+      producto_id: p.id,
+      stock_sistema: p.stock,
+      stock_contado: p.stock, // default = igual al sistema
+      motivo: 'conteo'
+    })});
+    added++;
+  }
+  hideLoad();
+  toast(`✓ ${added} productos agregados`,'success');
+  openAjuste(ajId);
+}
+
+// ── Eliminar línea individual ────────────────────────────────────────────
+async function deleteAjusteLine(lineId, ajId){
+  showLoad();
+  await sb(`/rest/v1/ajuste_lineas?id=eq.${lineId}`,{method:'DELETE'});
+  hideLoad();
+  openAjuste(ajId); // refresh
+}
+
+// ── Actualizar motivo de línea ───────────────────────────────────────────
+async function updateAjusteLineMot(lineId, motivo){
+  await sb(`/rest/v1/ajuste_lineas?id=eq.${lineId}`,{
+    method:'PATCH',
+    body:JSON.stringify({motivo})
+  });
+}
+
+// ── Guardar notas del ajuste ─────────────────────────────────────────────
+async function saveAjusteNotas(ajId, notas){
+  await sb(`/rest/v1/ajustes_inventario?id=eq.${ajId}`,{
+    method:'PATCH',
+    body:JSON.stringify({notas})
+  });
+  toast('Notas guardadas','success',1500);
+}
+
+// ── Renombrar ajuste ─────────────────────────────────────────────────────
+async function renameAjuste(ajId, currentName){
+  const nombre = prompt('Nombre del ajuste:', currentName);
+  if(!nombre||nombre===currentName) return;
+  showLoad();
+  await sb(`/rest/v1/ajustes_inventario?id=eq.${ajId}`,{method:'PATCH',body:JSON.stringify({nombre})});
+  hideLoad();
+  openAjuste(ajId);
+}
+
+// ── Exportar ajuste a CSV ────────────────────────────────────────────────
+async function exportAjuste(ajId, nombre){
+  showLoad();
+  const r = await sb(`/rest/v1/ajuste_lineas?ajuste_id=eq.${ajId}&select=*,productos(nombre,codigo)`);
+  hideLoad();
+  const rows=[['Producto','Código','Stock Sistema','Stock Contado','Diferencia','Motivo']];
+  (r.data||[]).forEach(l=>rows.push([
+    l.productos?.nombre||'',
+    l.productos?.codigo||'',
+    l.stock_sistema,
+    l.stock_contado,
+    l.diferencia,
+    l.motivo||'conteo'
+  ]));
+  downloadCSV(rows, `ajuste_${nombre.replace(/[^a-z0-9]/gi,'_')}.csv`);
+  toast('Ajuste exportado','success');
+}
+
+// ── Resumen antes de confirmar ────────────────────────────────────────────
+async function previewConfirmAjuste(ajId){
+  showLoad();
+  const r = await sb(`/rest/v1/ajuste_lineas?ajuste_id=eq.${ajId}&select=*,productos(nombre)`);
+  hideLoad();
+  const lines = r.data||[];
+  const diffs = lines.filter(l=>l.diferencia!==0);
+  const positivos = diffs.filter(l=>l.diferencia>0);
+  const negativos = diffs.filter(l=>l.diferencia<0);
+  const sinCambio = lines.filter(l=>l.diferencia===0);
+
+  if(!diffs.length){
+    if(!confirm(`Sin diferencias — todos los ${lines.length} productos coinciden con el sistema. ¿Confirmar igual?`)) return;
+    confirmarAjuste(ajId);
+    return;
+  }
+
+  openModal('⚠️ Confirmar ajuste',`
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+      <div style="background:var(--red-bg);border-radius:var(--r);padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">FALTANTE</div>
+        <div style="font-size:20px;font-weight:800;color:var(--red)">${negativos.length}</div>
+        <div style="font-size:10px;color:var(--text3)">productos</div>
+      </div>
+      <div style="background:var(--gbg);border-radius:var(--r);padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">SOBRANTE</div>
+        <div style="font-size:20px;font-weight:800;color:var(--green)">${positivos.length}</div>
+        <div style="font-size:10px;color:var(--text3)">productos</div>
+      </div>
+      <div style="background:var(--surface);border-radius:var(--r);padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">SIN CAMBIO</div>
+        <div style="font-size:20px;font-weight:800">${sinCambio.length}</div>
+        <div style="font-size:10px;color:var(--text3)">productos</div>
+      </div>
+    </div>
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Productos con diferencia</div>
+    <div style="border:1px solid var(--border);border-radius:var(--r);overflow:hidden;max-height:220px;overflow-y:auto">
+      ${diffs.map(l=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px">
+          <span style="font-weight:600">${esc(l.productos?.nombre||'')}</span>
+          <div style="display:flex;gap:10px;align-items:center">
+            <span style="color:var(--text3);font-family:var(--mono)">${l.stock_sistema} → ${l.stock_contado}</span>
+            <span style="font-family:var(--mono);font-weight:800;color:${l.diferencia>0?'var(--green)':'var(--red)'};min-width:40px;text-align:right">
+              ${l.diferencia>0?'+':''}${l.diferencia}
+            </span>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div style="margin-top:12px;padding:10px;background:var(--ybg);border-radius:var(--r);font-size:12px;color:var(--yellow)">
+      ⚠ Esta acción actualizará el stock de ${diffs.length} producto(s) y no se puede deshacer.
+    </div>`,
+  `<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+   <button class="btn btn-primary" onclick="confirmarAjuste('${ajId}');closeModal()">✅ Confirmar ajuste</button>`);
 }
 
 // Globals for inline onclick
