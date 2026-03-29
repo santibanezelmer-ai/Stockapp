@@ -5248,7 +5248,7 @@ async function loadSmartDash(){
     sb(`/rest/v1/ventas?negocio_id=eq.${nid}&created_at=gte.${yesterday}T00:00:00&created_at=lt.${today}T00:00:00&estado=neq.anulada&select=total`),
     sb(`/rest/v1/clientes?negocio_id=eq.${nid}&deuda_total=gt.0&select=nombre,deuda_total&order=deuda_total.desc&limit=5`),
     sb(`/rest/v1/productos?negocio_id=eq.${nid}&activo=eq.true&select=nombre,stock,stock_min&order=stock.asc&limit=5`),
-    sb(`/rest/v1/detalle_ventas?negocio_id=eq.${S.user.nid}&select=producto_id,cantidad,productos(nombre)&order=cantidad.desc&limit=100`),
+    sb(`/rest/v1/detalle_ventas?negocio_id=eq.${S.user.nid}&select=producto_id,cantidad&limit=500`),
   ]);
 
   const todaySales=todayR.data||[];
@@ -5263,7 +5263,8 @@ async function loadSmartDash(){
   const prodMap={};
   (topR.data||[]).forEach(d=>{
     const pid=d.producto_id;
-    if(!prodMap[pid])prodMap[pid]={name:d.productos?.nombre||'Producto',qty:0};
+    const prod=S.products.find(p=>p.id===pid);
+    if(!prodMap[pid])prodMap[pid]={name:prod?.name||'Producto',qty:0};
     prodMap[pid].qty+=parseInt(d.cantidad||0);
   });
   const topProds=Object.values(prodMap).sort((a,b)=>b.qty-a.qty).slice(0,3);
@@ -5449,7 +5450,7 @@ async function loadSmartStock(){
   try{
   const [prodsR,salesR]=await Promise.all([
     sb(`/rest/v1/productos?negocio_id=eq.${S.user.nid}&activo=eq.true&select=id,nombre,stock,stock_min,precio_costo,precio_venta`),
-    sb(`/rest/v1/detalle_ventas?negocio_id=eq.${S.user.nid}&select=producto_id,cantidad&order=created_at.desc`)
+    sb(`/rest/v1/detalle_ventas?negocio_id=eq.${S.user.nid}&select=producto_id,cantidad`)
   ]);
 
   const prods=prodsR.data||[];
@@ -6613,6 +6614,10 @@ async function loadKardex(pid){
   const el = document.getElementById('kardexContent');
   if(!el) return;
   const r = await sb(`/rest/v1/stock_movements?producto_id=eq.${pid}&negocio_id=eq.${S.user.nid}&order=created_at.desc&limit=100`);
+  if(!r.ok){
+    if(el)el.innerHTML='<div class="empty-state"><div class="icon">⚠️</div><p>Ejecuta el SQL del Sprint 1 en Supabase para activar el Kardex.</p><a href="#" onclick="closeModal()" style="color:var(--accent2)">Cerrar</a></div>';
+    return;
+  }
   const items = r.data || [];
   // Current product
   const p = S.products.find(p=>p.id===pid);
@@ -6701,6 +6706,7 @@ async function loadAjustesList(){
   const el = document.getElementById('ajustesList');
   if(!el) return;
   const r = await sb(`/rest/v1/ajustes_inventario?negocio_id=eq.${S.user.nid}&order=created_at.desc&limit=30`);
+  if(!r.ok){el.innerHTML='<div class="empty-state"><div class="icon">⚠️</div><p>Ejecuta el SQL del Sprint 1 en Supabase primero.</p></div>';return;}
   const items = r.data||[];
   if(!items.length){
     el.innerHTML='<div class="empty-state"><div class="icon">📋</div><p>Sin ajustes registrados</p></div>';
@@ -6725,6 +6731,8 @@ async function loadAjustesList(){
 async function newAjuste(){
   const nombre = `Conteo ${new Date().toLocaleDateString('es-CL')}`;
   showLoad();
+  const testR = await sb(`/rest/v1/ajustes_inventario?negocio_id=eq.${S.user.nid}&limit=1`);
+  if(!testR.ok){toast('Ejecuta el SQL del Sprint 1 en Supabase primero','error',4000);hideLoad();return;}
   const r = await sb('/rest/v1/ajustes_inventario',{method:'POST',body:JSON.stringify({
     negocio_id: S.user.nid,
     nombre,
@@ -6904,15 +6912,15 @@ async function loadOpDash(){
   const el = document.getElementById('opDashContent');
   if(!el) return;
   const nid = S.user.nid;
-  const [movR, prodR, reorderR] = await Promise.all([
+  const [movR, prodR, reorderR] = await Promise.allSettled([
     sb(`/rest/v1/stock_movements?negocio_id=eq.${nid}&order=created_at.desc&limit=20`),
     sb(`/rest/v1/productos?negocio_id=eq.${nid}&activo=eq.true&select=id,nombre,stock,stock_min`),
     sb(`/rest/v1/reorder_rules?negocio_id=eq.${nid}&activa=eq.true`)
   ]);
 
-  const movs = movR.data||[];
-  const prods = prodR.data||[];
-  const rules = reorderR.data||[];
+  const movs  = (movR.status==='fulfilled'&&movR.value.ok)    ? (movR.value.data||[])    : [];
+  const prods = (prodR.status==='fulfilled'&&prodR.value.ok)   ? (prodR.value.data||[])   : S.products.map(p=>({id:p.id,nombre:p.name,stock:p.stock,stock_min:p.minStock}));
+  const rules = (reorderR.status==='fulfilled'&&reorderR.value.ok) ? (reorderR.value.data||[]) : [];
 
   // Products needing reorder
   const sinStock = prods.filter(p=>parseInt(p.stock)<=0);
@@ -6961,7 +6969,7 @@ async function loadOpDash(){
 
     <!-- Últimos movimientos -->
     <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Últimos movimientos</div>
-    ${!movs.length?'<div class="empty-state" style="padding:12px"><p>Sin movimientos registrados aún</p></div>':
+    ${!movs.length?'<div class="empty-state" style="padding:12px"><div class="icon">📊</div><p>Sin movimientos aún.<br><small>Se registran automáticamente con cada venta o compra.</small></p></div>':
     `<div style="border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
       ${movs.slice(0,8).map(m=>{
         const colors={compra:'var(--green)',venta:'var(--red)',ajuste_positivo:'var(--green)',ajuste_negativo:'var(--red)',devolucion:'var(--yellow)',merma:'var(--red)'};
