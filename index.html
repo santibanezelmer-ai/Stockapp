@@ -980,6 +980,19 @@ body.app-active footer.site-footer{
   align-items:start;
   margin-top:4px;
 }
+body.tablet-mode #posLayout{
+  grid-template-columns:1fr 280px;
+  gap:10px;
+}
+body.tablet-mode .prod-grid{
+  grid-template-columns:repeat(3,1fr)!important;
+}
+body.tablet-mode .prod-card{
+  font-size:12px;
+}
+body.tablet-mode .prod-name{
+  font-size:12px;
+}
 #cartPanel{
   position:sticky;
   top:4px;
@@ -1228,6 +1241,9 @@ body.app-active footer.site-footer{
       <button id="themeToggleBtn" onclick="toggleTheme()" title="Cambiar tema"
         style="background:none;border:none;font-size:18px;cursor:pointer;padding:4px 6px;border-radius:var(--r);opacity:0.7;transition:opacity 0.15s"
         onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">🌙</button>
+      <button id="tabletModeBtn" onclick="toggleTabletMode()" title="Modo compacto"
+        style="background:none;border:none;font-size:16px;cursor:pointer;padding:4px 6px;border-radius:var(--r);opacity:0.7;transition:opacity 0.15s"
+        onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">🖥</button>
       <span class="offline-pill hidden" id="offlineBadge">⚠ Sin conexión</span>
       <button class="logout-btn" id="logoutBtn">🚪 Salir</button>
     </div>
@@ -1507,7 +1523,10 @@ body.app-active footer.site-footer{
       <!-- REPORTS -->
       <section class="section" id="sec-reports">
         <div class="sec-hd"><h2>Reportes</h2>
-          <button class="btn btn-outline btn-sm" onclick="exportSalesCSV()">📤 CSV Ventas</button></div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick="showSalesHistory()">📋 Historial</button>
+            <button class="btn btn-outline btn-sm" onclick="exportSalesCSV()">📤 CSV</button>
+          </div></div>
         <div class="tabs" id="repTabs">
           <button class="tab-btn active" data-p="day">Hoy</button>
           <button class="tab-btn" data-p="week">Semana</button>
@@ -2014,6 +2033,12 @@ async function startApp(){
   // Hide legal footer in app mode
   document.body.classList.add('app-active');
   initTheme();
+  const _tabletOn=localStorage.getItem('ox_tablet')==='1';
+  if(_tabletOn){
+    document.body.classList.add('tablet-mode');
+    const btn=document.getElementById('tabletModeBtn');
+    if(btn)btn.textContent='📱';
+  }
   const siteFooter=document.querySelector('footer.site-footer');
   if(siteFooter)siteFooter.style.display='none';
   await loadCfg();
@@ -2200,8 +2225,15 @@ function addToCart(pid){
   const p=S.products.find(p=>p.id===pid);if(!p)return;
   if(p.stock<=0){toast('Sin stock','warn');return;}
   const idx=S.cart.findIndex(i=>i.id===pid);
-  if(idx>=0)S.cart[idx].qty++;else S.cart.push({id:p.id,name:p.name,price:p.price,cost:p.cost,qty:1,unit:p.unit});
+  if(idx>=0)S.cart[idx].qty++;else S.cart.push({id:p.id,name:p.name,price:p.price,origPrice:p.price,cost:p.cost,qty:1,unit:p.unit,disc:0});
   updateCart();renderProdGrid($('salesSearch').value);
+}
+
+function setItemDisc(idx,val){
+  if(!S.cart[idx])return;
+  S.cart[idx].disc=Math.min(100,Math.max(0,parseFloat(val)||0));
+  S.cart[idx].effectivePrice=S.cart[idx].origPrice*(1-S.cart[idx].disc/100);
+  updateCart();
 }
 
 function chQty(idx,delta){
@@ -2212,7 +2244,9 @@ function chQty(idx,delta){
 
 function updateCart(){
   const disc=parseFloat($('discInput')?.value)||0;
-  const sub=S.cart.reduce((s,i)=>s+i.price*i.qty,0);
+  // Recalculate effective price with per-item discount
+  S.cart.forEach(i=>{i.effectivePrice=i.disc>0?i.origPrice*(1-i.disc/100):i.price;});
+  const sub=S.cart.reduce((s,i)=>s+(i.effectivePrice||i.price)*i.qty,0);
   const total=sub*(1-disc/100);
   const items=$('cartItems');
   if(!S.cart.length){
@@ -2222,7 +2256,29 @@ function updateCart(){
     return;
   }
   $('checkoutBtn').disabled=false;
-  items.innerHTML=S.cart.map((item,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--border)"><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">${esc(item.name)}</div><div style="font-size:11px;color:var(--text2)">${fmt(item.price)} c/u</div></div><div style="display:flex;align-items:center;gap:3px"><button class="qty-btn" data-idx="${i}" data-d="-1" style="width:22px;height:22px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center">−</button><span style="font-weight:800;font-size:13px;min-width:20px;text-align:center;font-family:var(--mono)">${item.qty}</span><button class="qty-btn" data-idx="${i}" data-d="1" style="width:22px;height:22px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center">+</button></div><span style="font-size:12px;font-weight:700;color:var(--green);min-width:54px;text-align:right;font-family:var(--mono)">${fmt(item.price*item.qty)}</span><button class="ci-del" data-idx="${i}" style="background:none;border:none;color:var(--text3);cursor:pointer;padding:2px 4px;font-size:13px">✕</button></div>`).join('');
+  items.innerHTML=S.cart.map((item,i)=>{
+    const ep=item.effectivePrice||item.price;
+    return`<div style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600">${esc(item.name)}</div>
+        <div style="display:flex;align-items:center;gap:4px;margin-top:2px">
+          <span style="font-size:11px;color:var(--text2)">${fmt(item.origPrice||item.price)}</span>
+          <input type="number" value="${item.disc||0}" min="0" max="100" placeholder="0%"
+            data-disc="${i}" onchange="setItemDisc(${i},this.value)"
+            style="width:42px;padding:2px 4px;background:var(--surface);border:1px solid var(--border2);border-radius:4px;color:${item.disc>0?'var(--yellow)':'var(--text3)'};font-size:10px;text-align:center;outline:none"
+            title="Descuento %">
+          <span style="font-size:10px;color:var(--text3)">%</span>
+          ${item.disc>0?`<span style="font-size:10px;color:var(--yellow)">→${fmt(ep)}</span>`:''}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:3px">
+        <button class="qty-btn" data-idx="${i}" data-d="-1" style="width:22px;height:22px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center">−</button>
+        <span style="font-weight:800;font-size:13px;min-width:20px;text-align:center;font-family:var(--mono)">${item.qty}</span>
+        <button class="qty-btn" data-idx="${i}" data-d="1" style="width:22px;height:22px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--text);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center">+</button>
+      </div>
+      <span style="font-size:12px;font-weight:700;color:var(--green);min-width:52px;text-align:right;font-family:var(--mono)">${fmt(ep*item.qty)}</span>
+      <button class="ci-del" data-idx="${i}" style="background:none;border:none;color:var(--text3);cursor:pointer;padding:2px 4px;font-size:13px">✕</button>
+    </div>`}).join('');
   $('cartTotal').textContent=fmt(total);
   // Ensure cart is visible on mobile
   const cartBox=document.querySelector('.cart-box');
@@ -2249,7 +2305,9 @@ function renderPayGrid(){
 async function doCheckout(){
   if(!S.cart.length){toast('Carrito vacío','warn');return;}
   const disc=parseFloat($('discInput').value)||0;
-  const sub=S.cart.reduce((s,i)=>s+i.price*i.qty,0);
+  // Recalculate effective price with per-item discount
+  S.cart.forEach(i=>{i.effectivePrice=i.disc>0?i.origPrice*(1-i.disc/100):i.price;});
+  const sub=S.cart.reduce((s,i)=>s+(i.effectivePrice||i.price)*i.qty,0);
   const total=sub*(1-disc/100);
   const clientId=S.payMethod==='fiado'?$('fiadoClient').value:$('saleClient').value;
   if(S.payMethod==='fiado'&&!clientId){toast('Selecciona un cliente para fiado','warn');return;}
@@ -2260,7 +2318,7 @@ async function doCheckout(){
     if(!sr.ok)throw new Error('Error al registrar venta');
     const saleId=sr.data[0].id;
     for(const item of S.cart){
-      await sb('/rest/v1/detalle_ventas',{method:'POST',body:JSON.stringify({venta_id:saleId,negocio_id:S.user.nid,producto_id:item.id,nombre:item.name,cantidad:item.qty,precio_venta:item.price,precio_costo:item.cost||0,subtotal:item.price*item.qty})});
+      await sb('/rest/v1/detalle_ventas',{method:'POST',body:JSON.stringify({venta_id:saleId,negocio_id:S.user.nid,producto_id:item.id,nombre:item.name,cantidad:item.qty,precio_venta:item.effectivePrice||item.price,precio_costo:item.cost||0,subtotal:(item.effectivePrice||item.price)*item.qty,descuento_item:item.disc||0})});
       const pr=await sb(`/rest/v1/productos?id=eq.${item.id}&select=stock,variantes`);
       if(pr.data&&pr.data[0]){
         const newStock=Math.max(0,(parseInt(pr.data[0].stock)||0)-item.qty);
@@ -2294,8 +2352,102 @@ async function doCheckout(){
 
 function showReceipt(d){
   const biz=S.cfg.businessName||'Mi Negocio';
-  openModal('Boleta',`<div class="receipt"><div class="receipt-hd"><div class="receipt-biz">${esc(biz)}</div><div style="font-size:12px;color:#666">${new Date().toLocaleString('es-CL')}</div><div style="font-size:11px;color:#999">#${d.saleId.slice(-8)}</div></div><hr class="receipt-hr">${d.items.map(i=>`<div class="receipt-row"><span>${i.qty}x ${esc(i.name)}</span><span>${fmt(i.price*i.qty)}</span></div>`).join('')}<hr class="receipt-hr">${d.disc>0?`<div class="receipt-row" style="color:#666"><span>Desc. ${d.disc}%</span><span>-${fmt(d.sub*d.disc/100)}</span></div>`:''}<div class="receipt-total"><span>TOTAL</span><span>${fmt(d.total)}</span></div>${d.payMethod==='efectivo'&&d.cash>=d.total?`<div class="receipt-row" style="margin-top:8px"><span>Recibido</span><span>${fmt(d.cash)}</span></div><div class="receipt-row"><span>Vuelto</span><span>${fmt(d.cash-d.total)}</span></div>`:''}<div style="text-align:center;margin-top:12px;font-size:11px;color:#999">Pago: ${d.payMethod}</div></div>`,
-  `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button><button class="btn btn-success" onclick="shareRec('${esc(biz)}',${d.total},'${d.payMethod}')">📲 WhatsApp</button>`);
+  const rut=S.cfg.rut?`<div style="font-size:11px;color:#888">RUT: ${S.cfg.rut}</div>`:'';
+  const addr=S.cfg.address?`<div style="font-size:11px;color:#888">${S.cfg.address}</div>`:'';
+  const phone=S.cfg.phone?`<div style="font-size:11px;color:#888">${S.cfg.phone}</div>`:'';
+  const logo=S.cfg.logoUrl?`<img src="${S.cfg.logoUrl}" style="height:50px;object-fit:contain;margin-bottom:6px">`:'';
+  const now=new Date().toLocaleString('es-CL');
+  const receiptHTML=`
+    <div class="receipt">
+      <div class="receipt-hd">
+        ${logo}
+        <div class="receipt-biz">${esc(biz)}</div>
+        ${rut}${addr}${phone}
+        <div style="font-size:11px;color:#888;margin-top:4px">${now}</div>
+        <div style="font-size:11px;color:#aaa">#${d.saleId.slice(-8)}</div>
+      </div>
+      <hr class="receipt-hr">
+      ${d.items.map(i=>{
+        const ep=i.effectivePrice||i.price;
+        const discNote=i.disc>0?` <span style="color:#e5a000;font-size:10px">-${i.disc}%</span>`:'';
+        return`<div class="receipt-row"><span>${i.qty}x ${esc(i.name)}${discNote}</span><span>${fmt(ep*i.qty)}</span></div>`;
+      }).join('')}
+      <hr class="receipt-hr">
+      <div class="receipt-row" style="color:#888"><span>Subtotal</span><span>${fmt(d.sub)}</span></div>
+      ${d.disc>0?`<div class="receipt-row" style="color:#e5a000"><span>Desc. global ${d.disc}%</span><span>-${fmt(d.sub*d.disc/100)}</span></div>`:''}
+      <div class="receipt-total"><span>TOTAL</span><span>${fmt(d.total)}</span></div>
+      ${d.payMethod==='efectivo'&&d.cash>=d.total?`
+        <div class="receipt-row" style="margin-top:8px"><span>Recibido</span><span>${fmt(d.cash)}</span></div>
+        <div class="receipt-row"><span>Vuelto</span><span>${fmt(d.cash-d.total)}</span></div>`:''}
+      <div style="text-align:center;margin-top:10px;font-size:11px;color:#999">Pago: ${d.payMethod}</div>
+      <div style="text-align:center;margin-top:16px;font-size:10px;color:#bbb;border-top:1px dashed #ddd;padding-top:8px">Gracias por su compra</div>
+    </div>`;
+
+  openModal('Boleta', receiptHTML,
+    `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>
+     <button class="btn btn-outline" onclick="printReceipt()">🖨 Imprimir</button>
+     <button class="btn btn-primary" onclick="downloadReceiptPDF('${esc(biz)}')">⬇ PDF</button>
+     <button class="btn btn-success" onclick="shareRec('${esc(biz)}',${d.total},'${d.payMethod}')">📲 WhatsApp</button>`);
+  // Store last receipt data for print/pdf
+  window._lastReceipt={biz,rut:S.cfg.rut||'',addr:S.cfg.address||'',phone:S.cfg.phone||'',logo:S.cfg.logoUrl||'',now,d};
+}
+
+function printReceipt(){
+  const r=window._lastReceipt;if(!r)return;
+  const w=window.open('','_blank','width=340,height=600');
+  w.document.write(buildReceiptHTML(r,true));
+  w.document.close();
+  setTimeout(()=>{w.print();},400);
+}
+
+function downloadReceiptPDF(biz){
+  const r=window._lastReceipt;if(!r)return;
+  const w=window.open('','_blank');
+  w.document.write(buildReceiptHTML(r,false));
+  w.document.close();
+  setTimeout(()=>{w.print();},500);
+  toast('Usa "Guardar como PDF" al imprimir','success',3000);
+}
+
+function buildReceiptHTML(r,narrow){
+  const {biz,rut,addr,phone,logo,now,d}=r;
+  const w=narrow?'280px':'360px';
+  return`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Boleta — ${esc(biz)}</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Courier New',monospace;font-size:12px;width:${w};margin:0 auto;padding:12px;color:#111}
+    .hd{text-align:center;margin-bottom:10px}
+    .biz{font-size:16px;font-weight:bold;margin-bottom:2px}
+    .sub{font-size:10px;color:#666}
+    .hr{border:none;border-top:1px dashed #999;margin:8px 0}
+    .row{display:flex;justify-content:space-between;margin:3px 0;font-size:11px}
+    .total{display:flex;justify-content:space-between;font-size:14px;font-weight:bold;margin:6px 0;padding-top:6px;border-top:2px solid #111}
+    .footer{text-align:center;font-size:10px;color:#999;margin-top:12px;padding-top:8px;border-top:1px dashed #ccc}
+    img{max-height:48px;object-fit:contain}
+    @media print{body{width:100%}}
+  </style></head><body>
+  <div class="hd">
+    ${logo?`<div><img src="${logo}"></div>`:''}
+    <div class="biz">${esc(biz)}</div>
+    ${rut?`<div class="sub">RUT: ${esc(rut)}</div>`:''}
+    ${addr?`<div class="sub">${esc(addr)}</div>`:''}
+    ${phone?`<div class="sub">${esc(phone)}</div>`:''}
+    <div class="sub">${now}</div>
+    <div class="sub">#${d.saleId.slice(-8)}</div>
+  </div>
+  <hr class="hr">
+  ${d.items.map(i=>{
+    const ep=i.effectivePrice||i.price;
+    return`<div class="row"><span>${i.qty}x ${esc(i.name)}${i.disc>0?` (-${i.disc}%)`:''}</span><span>${fmt(ep*i.qty)}</span></div>`;
+  }).join('')}
+  <hr class="hr">
+  <div class="row"><span>Subtotal</span><span>${fmt(d.sub)}</span></div>
+  ${d.disc>0?`<div class="row"><span>Desc. ${d.disc}%</span><span>-${fmt(d.sub*d.disc/100)}</span></div>`:''}
+  <div class="total"><span>TOTAL</span><span>${fmt(d.total)}</span></div>
+  <div class="row"><span>Pago: ${d.payMethod}</span></div>
+  ${d.payMethod==='efectivo'&&d.cash>=d.total?`<div class="row"><span>Recibido</span><span>${fmt(d.cash)}</span></div><div class="row"><span>Vuelto</span><span>${fmt(d.cash-d.total)}</span></div>`:''}
+  <div class="footer">Gracias por su compra<br>Generado por OperixERP</div>
+  </body></html>`;
 }
 function shareRec(biz,total,method){window.open('https://wa.me/?text='+encodeURIComponent(`Boleta — ${biz}\nTotal: ${fmt(total)}\nPago: ${method}\nFecha: ${new Date().toLocaleString('es-CL')}`),'_blank');}
 
@@ -3261,7 +3413,7 @@ async function saveCFMove(tipo){
 
 // REPORTS
 async function loadRep(period='day'){
-  if(!S.user)return;S.repPeriod=period;
+  if(!S.user)return;S.repPeriod=period;S.repPage=S.repPage||0;
   const nid=S.user.nid;
   const ranges={day:new Date().toISOString().slice(0,10)+'T00:00:00',week:new Date(Date.now()-7*86400000).toISOString(),month:new Date(Date.now()-30*86400000).toISOString()};
   const prevRanges={day:new Date(Date.now()-86400000).toISOString().slice(0,10)+'T00:00:00',week:new Date(Date.now()-14*86400000).toISOString(),month:new Date(Date.now()-60*86400000).toISOString()};
@@ -3586,7 +3738,12 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   $('dashRefreshBtn').addEventListener('click',loadDash);
 
   // Sales
-  $('salesSearch').addEventListener('input',e=>renderProdGrid(e.target.value));
+  // Debounced search for better performance
+  let _srchTimer;
+  $('salesSearch').addEventListener('input',e=>{
+    clearTimeout(_srchTimer);
+    _srchTimer=setTimeout(()=>renderProdGrid(e.target.value),150);
+  });
   $('discInput').addEventListener('input',updateCart);
   $('cashRec').addEventListener('input',updateCart);
   $('checkoutBtn').addEventListener('click',doCheckout);
@@ -6229,6 +6386,166 @@ async function payPayable(id){
   showLoad();
   await sb(`/rest/v1/cuentas_pagar?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({estado:'pagada'})});
   hideLoad();toast('Pagada','success');loadPayables();
+}
+
+// ═══════════════════════════════════════════════════
+// HISTORIAL DE VENTAS + TURNO DE CAJA
+// ═══════════════════════════════════════════════════
+
+async function showSalesHistory(){
+  openModal('📋 Historial de Ventas',`
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      <input type="date" id="histFrom" value="${new Date(Date.now()-7*86400000).toISOString().slice(0,10)}"
+        style="padding:7px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px;outline:none;flex:1;min-width:120px">
+      <input type="date" id="histTo" value="${new Date().toISOString().slice(0,10)}"
+        style="padding:7px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px;outline:none;flex:1;min-width:120px">
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+      <select id="histPago" style="flex:1;min-width:100px;padding:7px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px;outline:none">
+        <option value="">Todos los pagos</option>
+        <option value="efectivo">Efectivo</option>
+        <option value="transferencia">Transferencia</option>
+        <option value="tarjeta">Tarjeta</option>
+        <option value="fiado">Fiado</option>
+      </select>
+      <input type="text" id="histSearch" placeholder="Buscar por ID o cliente..." oninput="filterHistList(this.value)"
+        style="flex:2;min-width:140px;padding:7px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px;outline:none">
+      <button class="btn btn-primary btn-sm" onclick="loadSalesHistory()">Buscar</button>
+    </div>
+    <div id="histSummary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px"></div>
+    <div id="histList" class="data-list" style="max-height:340px;overflow-y:auto">
+      <div style="text-align:center;color:var(--text3);padding:20px;font-size:13px">Selecciona un rango y presiona Buscar</div>
+    </div>`,
+  `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>
+   <button class="btn btn-outline" onclick="exportSalesCSV()">📤 CSV</button>`);
+  // Auto-load last 7 days
+  setTimeout(loadSalesHistory, 100);
+}
+
+let _histData = [];
+function filterHistList(q){
+  const el=$('histList');if(!el||!_histData.length)return;
+  const ql=(q||'').toLowerCase();
+  const filtered=ql?_histData.filter(v=>
+    v.id.slice(-6).includes(ql)||
+    (v.pago||'').toLowerCase().includes(ql)||
+    fmt(v.total).includes(ql)
+  ):_histData;
+  if(!filtered.length){el.innerHTML='<div class="empty-state"><p>Sin resultados</p></div>';return;}
+  el.innerHTML=filtered.map(v=>`
+    <div class="data-item" style="cursor:pointer" onclick="showSaleDetail('${v.id}')">
+      <div class="d-icon" style="background:var(--gbg)">🛒</div>
+      <div class="d-info">
+        <div class="d-title">#${v.id.slice(-6)} · ${esc(v.pago||'efectivo')}</div>
+        <div class="d-sub">${fmtDT(v.created_at)}${v.estado==='fiado'?' · <span style="color:var(--yellow)">Fiado</span>':''}</div>
+      </div>
+      <div class="d-right">
+        <div class="d-amount green">${fmt(v.total)}</div>
+        ${v.descuento>0?`<div style="font-size:10px;color:var(--yellow)">-${v.descuento}%</div>`:''}
+      </div>
+    </div>`).join('');
+}
+
+async function loadSalesHistory(){
+  const from=$('histFrom').value;
+  const to=$('histTo').value;
+  const pago=$('histPago').value;
+  const el=$('histList');
+  const sum=$('histSummary');
+  if(!el)return;
+  el.innerHTML='<div style="text-align:center;padding:20px"><div class="spinner"></div></div>';
+  let url=`/rest/v1/ventas?negocio_id=eq.${S.user.nid}&order=created_at.desc&limit=200`;
+  if(from) url+=`&created_at=gte.${from}T00:00:00`;
+  if(to)   url+=`&created_at=lte.${to}T23:59:59`;
+  if(pago) url+=`&pago=eq.${pago}`;
+  const r=await sb(url);
+  const items=(r.data||[]).filter(v=>v.estado!=='anulada');
+  const total=items.reduce((s,v)=>s+parseFloat(v.total||0),0);
+  const byPago={};items.forEach(v=>{byPago[v.pago]=(byPago[v.pago]||0)+1;});
+  // Summary
+  if(sum) sum.innerHTML=`
+    <div style="background:var(--surface);border-radius:var(--r);padding:10px;text-align:center">
+      <div style="font-size:10px;color:var(--text3)">VENTAS</div>
+      <div style="font-size:20px;font-weight:800">${items.length}</div>
+    </div>
+    <div style="background:var(--surface);border-radius:var(--r);padding:10px;text-align:center">
+      <div style="font-size:10px;color:var(--text3)">TOTAL</div>
+      <div style="font-family:var(--mono);font-size:16px;font-weight:800;color:var(--green)">${fmt(total)}</div>
+    </div>
+    <div style="background:var(--surface);border-radius:var(--r);padding:10px;text-align:center">
+      <div style="font-size:10px;color:var(--text3)">TICKET PROM.</div>
+      <div style="font-family:var(--mono);font-size:16px;font-weight:800;color:var(--accent2)">${fmt(items.length?total/items.length:0)}</div>
+    </div>`;
+  if(!items.length){el.innerHTML='<div class="empty-state"><div class="icon">📋</div><p>Sin ventas en ese período</p></div>';return;}
+  _histData=items;
+  filterHistList($('histSearch')?.value||'');
+}
+
+async function reprintSale(vid){
+  showLoad();
+  const [vr,dr]=await Promise.all([
+    sb(`/rest/v1/ventas?id=eq.${vid}`),
+    sb(`/rest/v1/detalle_ventas?venta_id=eq.${vid}&order=id.asc`)
+  ]);
+  hideLoad();
+  const v=vr.data?.[0]; const lines=dr.data||[];
+  if(!v)return;
+  const biz=S.cfg.businessName||'Mi Negocio';
+  const items=lines.map(l=>({name:l.nombre,qty:l.cantidad,price:l.precio_venta,effectivePrice:l.precio_venta,disc:l.descuento_item||0,cost:l.precio_costo||0}));
+  const d={saleId:vid,items,sub:parseFloat(v.subtotal||v.total),disc:parseFloat(v.descuento||0),total:parseFloat(v.total),payMethod:v.pago,cash:parseFloat(v.efectivo_rec||0)};
+  window._lastReceipt={biz,rut:S.cfg.rut||'',addr:S.cfg.address||'',phone:S.cfg.phone||'',logo:S.cfg.logoUrl||'',now:fmtDT(v.created_at),d};
+  printReceipt();
+}
+
+async function showSaleDetail(vid){
+  showLoad();
+  const r=await sb(`/rest/v1/detalle_ventas?venta_id=eq.${vid}&order=id.asc`);
+  const vr=await sb(`/rest/v1/ventas?id=eq.${vid}`);
+  hideLoad();
+  const lines=r.data||[];
+  const v=vr.data?.[0];
+  if(!v)return;
+  openModal(`🛒 Venta #${vid.slice(-6)}`,`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+      <div style="background:var(--surface);border-radius:var(--r);padding:10px">
+        <div style="font-size:10px;color:var(--text3)">FECHA</div>
+        <div style="font-weight:700">${fmtDT(v.created_at)}</div>
+      </div>
+      <div style="background:var(--surface);border-radius:var(--r);padding:10px">
+        <div style="font-size:10px;color:var(--text3)">PAGO</div>
+        <div style="font-weight:700">${esc(v.pago||'efectivo')}</div>
+      </div>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:10px">
+      <div style="background:var(--surface);padding:8px 12px;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;display:grid;grid-template-columns:1fr 60px 80px">
+        <div>Producto</div><div style="text-align:right">Cant.</div><div style="text-align:right">Total</div>
+      </div>
+      ${lines.map(l=>`
+        <div style="display:grid;grid-template-columns:1fr 60px 80px;padding:8px 12px;border-top:1px solid var(--border);font-size:13px">
+          <div>${esc(l.nombre)}</div>
+          <div style="text-align:right;color:var(--text2)">${l.cantidad}</div>
+          <div style="text-align:right;font-family:var(--mono);font-weight:700">${fmt(l.subtotal)}</div>
+        </div>`).join('')}
+      ${v.descuento>0?`<div style="display:grid;grid-template-columns:1fr 80px;padding:8px 12px;border-top:1px solid var(--border);color:var(--yellow)"><div>Descuento global ${v.descuento}%</div><div style="text-align:right;font-family:var(--mono)">-${fmt(parseFloat(v.subtotal||0)*parseFloat(v.descuento||0)/100)}</div></div>`:''}
+      <div style="display:grid;grid-template-columns:1fr 80px;padding:10px 12px;border-top:2px solid var(--border2);background:var(--surface)">
+        <div style="font-weight:800">TOTAL</div>
+        <div style="text-align:right;font-family:var(--mono);font-weight:800;font-size:16px;color:var(--accent2)">${fmt(v.total)}</div>
+      </div>
+    </div>
+    ${v.estado==='anulada'?'<div style="background:var(--red-bg);color:var(--red);padding:8px 12px;border-radius:var(--r);font-weight:700">⚠ Venta anulada</div>':''}`,
+  `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>
+   <button class="btn btn-outline btn-sm" onclick="reprintSale('${vid}')">🖨 Reimprimir</button>
+   ${v.estado!=='anulada'?`<button class="btn btn-danger btn-sm" onclick="anularVenta('${vid}','')">Anular</button>`:''}`);
+}
+
+// Tablet/compact mode toggle
+function toggleTabletMode(){
+  const on=!document.body.classList.contains('tablet-mode');
+  document.body.classList.toggle('tablet-mode',on);
+  localStorage.setItem('ox_tablet',on?'1':'0');
+  const btn=document.getElementById('tabletModeBtn');
+  if(btn)btn.textContent=on?'📱 Normal':'🖥 Compacto';
+  toast(on?'Modo compacto activado':'Modo normal activado','success',1500);
 }
 
 // Globals for inline onclick
