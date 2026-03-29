@@ -1368,6 +1368,8 @@ body.tablet-mode .prod-name{
             <button class="btn btn-outline btn-sm" id="exportInvBtn">📤</button>
             <button class="btn btn-outline btn-sm" id="importInvBtn">📥</button>
             <input type="file" id="importFile" accept=".csv" class="hidden">
+            <button class="btn btn-outline btn-sm" onclick="showStockDashboard()" title="Dashboard operacional">⚡</button>
+            <button class="btn btn-outline btn-sm" onclick="showAjustesModule()" title="Ajustes de inventario">📋</button>
             <button class="btn btn-outline btn-sm" onclick="showSmartStock()" title="Stock inteligente">🧠</button>
             <button class="btn btn-primary btn-sm" id="addProdBtn">+ Producto</button>
           </div>
@@ -2463,7 +2465,8 @@ function renderInv(){
   const g=$('invGrid');
   if(!prods.length){g.innerHTML='<div class="empty-state" style="grid-column:span 2"><div class="icon">📦</div><p>Sin productos</p></div>';return;}
   const hl=(txt,q)=>q?txt.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'),'<mark style="background:var(--glow);color:var(--accent2);border-radius:2px">$1</mark>'):esc(txt);
-  g.innerHTML=prods.map(p=>{const sc=p.stock===0?'stk-out':p.stock<=p.minStock?'stk-low':'stk-ok';const sl=p.stock===0?'❌':p.stock<=p.minStock?'⚠ '+p.stock:'✓ '+p.stock;return`<div class="inv-card"><div class="inv-img" style="cursor:${p.gallery&&p.gallery.length>1?'pointer':'default'}" ${p.gallery&&p.gallery.length>1?`onclick="cycleInvImg(this,'${p.id}')"`:''}>${p.img?`<img src="${esc(p.img)}" loading="lazy" data-pid="${p.id}">`:'📦'}${p.gallery&&p.gallery.length>1?`<div class="prod-img-dots">${p.gallery.slice(0,4).map((_,i)=>`<div class="prod-img-dot${i===0?' active':''}"></div>`).join('')}</div>`:''}</div><div class="inv-body"><div class="inv-name">${hl(p.name,q)}</div><div class="inv-row"><div class="inv-price">${fmt(p.price)}${p.unit!=='unidad'?' /'+p.unit:''}</div><span class="inv-stk ${sc}">${sl}</span></div></div><div class="inv-actions"><button class="btn btn-outline" data-id="${p.id}" data-a="edit">✏️</button><button class="btn btn-ghost" data-id="${p.id}" data-pn="${esc(p.name)}" data-a="priceHist" title="Historial precios">📈</button><button class="btn btn-danger" data-id="${p.id}" data-n="${esc(p.name)}" data-a="del">🗑</button><button class="btn btn-ghost" data-id="${p.id}" data-a="dup" title="Duplicar" style="padding:6px 8px;font-size:12px">⧉</button></div></div>`;}).join('');
+  g.innerHTML=prods.map(p=>{const sc=p.stock===0?'stk-out':p.stock<=p.minStock?'stk-low':'stk-ok';const sl=p.stock===0?'❌':p.stock<=p.minStock?'⚠ '+p.stock:'✓ '+p.stock;return`<div class="inv-card"><div class="inv-img" style="cursor:${p.gallery&&p.gallery.length>1?'pointer':'default'}" ${p.gallery&&p.gallery.length>1?`onclick="cycleInvImg(this,'${p.id}')"`:''}>${p.img?`<img src="${esc(p.img)}" loading="lazy" data-pid="${p.id}">`:'📦'}${p.gallery&&p.gallery.length>1?`<div class="prod-img-dots">${p.gallery.slice(0,4).map((_,i)=>`<div class="prod-img-dot${i===0?' active':''}"></div>`).join('')}</div>`:''}</div><div class="inv-body"><div class="inv-name">${hl(p.name,q)}</div><div class="inv-row"><div class="inv-price">${fmt(p.price)}${p.unit!=='unidad'?' /'+p.unit:''}</div><span class="inv-stk ${sc}">${sl}</span></div></div><div class="inv-actions"><button class="btn btn-outline" data-id="${p.id}" data-a="edit">✏️</button><button class="btn btn-ghost" data-id="${p.id}" data-pn="${esc(p.name)}" data-a="priceHist" title="Historial precios">📈</button>
+        <button class="btn btn-ghost" data-id="${p.id}" data-pn="${esc(p.name)}" data-a="kardex" title="Kardex movimientos">📊</button><button class="btn btn-danger" data-id="${p.id}" data-n="${esc(p.name)}" data-a="del">🗑</button><button class="btn btn-ghost" data-id="${p.id}" data-a="dup" title="Duplicar" style="padding:6px 8px;font-size:12px">⧉</button></div></div>`;}).join('');
 }
 
 function showProdForm(p=null){
@@ -4219,8 +4222,10 @@ async function saveDevolution(){
       for(const dv of dvR.data||[]){
         const pr=await sb(`/rest/v1/productos?id=eq.${dv.producto_id}&select=stock`);
         if(pr.data&&pr.data[0]){
-          const newStock=parseInt(pr.data[0].stock||0)+parseInt(dv.cantidad||1);
+          const stockAntesDev=parseInt(pr.data[0].stock||0);
+          const newStock=stockAntesDev+parseInt(dv.cantidad||1);
           await sb(`/rest/v1/productos?id=eq.${dv.producto_id}`,{method:'PATCH',body:JSON.stringify({stock:newStock})});
+          registrarMovimiento({productoId:dv.producto_id,cantidad:parseInt(dv.cantidad||1),tipo:'devolucion',refId:ventaId,refTipo:'devolucion',notas:'Devolución: '+motivo,stockAntes:stockAntesDev});
         }
       }
       auditLog('stock_ajuste',{motivo:'Devolución: '+motivo,venta_id:ventaId});
@@ -6546,6 +6551,435 @@ function toggleTabletMode(){
   const btn=document.getElementById('tabletModeBtn');
   if(btn)btn.textContent=on?'📱 Normal':'🖥 Compacto';
   toast(on?'Modo compacto activado':'Modo normal activado','success',1500);
+}
+
+// ═══════════════════════════════════════════════════
+// SPRINT 1 — MOTOR DE MOVIMIENTOS DE STOCK
+// ═══════════════════════════════════════════════════
+
+// ── Función central: registrar movimiento ─────────────────────────────────
+// Non-blocking: si falla, no interrumpe la operación principal
+async function registrarMovimiento({productoId, cantidad, tipo, refId='', refTipo='', notas='', stockAntes=null}){
+  try{
+    // Obtener stock actual si no se pasa
+    let antes = stockAntes;
+    if(antes === null){
+      const pr = await _realSb(`/rest/v1/productos?id=eq.${productoId}&select=stock`);
+      antes = pr.data?.[0]?.stock ?? 0;
+    }
+    const despues = antes + cantidad;
+    await _realSb('/rest/v1/stock_movements', {
+      method: 'POST',
+      body: JSON.stringify({
+        negocio_id:     S.user.nid,
+        producto_id:    productoId,
+        tipo,
+        cantidad,
+        stock_antes:    antes,
+        stock_despues:  despues,
+        referencia_id:  refId   || null,
+        referencia_tipo:refTipo || null,
+        notas:          notas   || null,
+        usuario_id:     S.user.id,
+        usuario_nombre: S.user.name || S.user.login
+      })
+    });
+  }catch(e){
+    // Non-critical — log solo, nunca interrumpir la operación principal
+    console.warn('[Stock] Movimiento no registrado:', e.message, {productoId, tipo, cantidad});
+  }
+}
+
+// ── Registrar múltiples movimientos (batch) ───────────────────────────────
+async function registrarMovimientos(movimientos){
+  // Fire-and-forget en paralelo
+  await Promise.allSettled(movimientos.map(m => registrarMovimiento(m)));
+}
+
+// ── Kardex: historial de movimientos de un producto ──────────────────────
+async function showKardex(pid, pname){
+  openModal(`📊 Kardex — ${esc(pname)}`, `
+    <div id="kardexContent" style="min-height:200px">
+      <div style="text-align:center;padding:20px;color:var(--text3)">Cargando...</div>
+    </div>`,
+    `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>
+     <button class="btn btn-outline btn-sm" onclick="exportKardex('${pid}','${esc(pname)}')">📤 CSV</button>`
+  );
+  // Load async after modal opens
+  setTimeout(()=>loadKardex(pid), 50);
+}
+
+async function loadKardex(pid){
+  const el = document.getElementById('kardexContent');
+  if(!el) return;
+  const r = await sb(`/rest/v1/stock_movements?producto_id=eq.${pid}&negocio_id=eq.${S.user.nid}&order=created_at.desc&limit=100`);
+  const items = r.data || [];
+  // Current product
+  const p = S.products.find(p=>p.id===pid);
+  const stockActual = p?.stock ?? 0;
+
+  if(!items.length){
+    el.innerHTML=`
+      <div style="background:var(--surface);border-radius:var(--r);padding:12px;margin-bottom:12px;display:flex;justify-content:space-between">
+        <span style="font-weight:700">Stock actual</span>
+        <span style="font-family:var(--mono);font-weight:800;font-size:18px;color:var(--green)">${stockActual}</span>
+      </div>
+      <div class="empty-state"><div class="icon">📊</div><p>Sin movimientos registrados aún.<br><small>Los movimientos se registran desde este deploy.</small></p></div>`;
+    return;
+  }
+
+  const tipoIcon = {
+    compra:'📥', venta:'📤', ajuste_positivo:'⬆️', ajuste_negativo:'⬇️',
+    devolucion:'↩️', transferencia:'🔄', apertura:'🏁', merma:'🗑'
+  };
+  const tipoColor = {
+    compra:'var(--green)', venta:'var(--red)', ajuste_positivo:'var(--green)',
+    ajuste_negativo:'var(--red)', devolucion:'var(--yellow)', merma:'var(--red)',
+    transferencia:'var(--blue)', apertura:'var(--text2)'
+  };
+  const tipoLabel = {
+    compra:'Compra', venta:'Venta', ajuste_positivo:'Ajuste +',
+    ajuste_negativo:'Ajuste −', devolucion:'Devolución',
+    transferencia:'Traslado', apertura:'Apertura', merma:'Merma'
+  };
+
+  el.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--r);padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:700">Stock actual</span>
+      <span style="font-family:var(--mono);font-weight:800;font-size:20px;color:var(--green)">${stockActual}</span>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+      <div style="display:grid;grid-template-columns:90px 80px 70px 70px 1fr;gap:0;background:var(--surface);padding:8px 10px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">
+        <div>Fecha</div><div>Tipo</div><div style="text-align:right">Cant.</div><div style="text-align:right">Stock</div><div style="padding-left:8px">Referencia</div>
+      </div>
+      ${items.map(m=>`
+        <div style="display:grid;grid-template-columns:90px 80px 70px 70px 1fr;gap:0;padding:9px 10px;border-top:1px solid var(--border);font-size:12px;align-items:center">
+          <div style="color:var(--text3);font-size:11px">${fmtD(m.created_at)}</div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span>${tipoIcon[m.tipo]||'📋'}</span>
+            <span style="font-size:11px;font-weight:600;color:${tipoColor[m.tipo]||'var(--text)'}">${tipoLabel[m.tipo]||m.tipo}</span>
+          </div>
+          <div style="text-align:right;font-family:var(--mono);font-weight:700;color:${m.cantidad>0?'var(--green)':'var(--red)'}">
+            ${m.cantidad>0?'+':''}${m.cantidad}
+          </div>
+          <div style="text-align:right;font-family:var(--mono);font-weight:800">${m.stock_despues}</div>
+          <div style="padding-left:8px;color:var(--text3);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+            ${esc(m.notas||m.usuario_nombre||'')}
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+async function exportKardex(pid, pname){
+  const r = await sb(`/rest/v1/stock_movements?producto_id=eq.${pid}&negocio_id=eq.${S.user.nid}&order=created_at.asc&limit=500`);
+  const rows = [['Fecha','Tipo','Cantidad','Stock Antes','Stock Después','Referencia','Usuario','Notas']];
+  (r.data||[]).forEach(m=>rows.push([
+    new Date(m.created_at).toLocaleString('es-CL'),
+    m.tipo, m.cantidad, m.stock_antes, m.stock_despues,
+    m.referencia_tipo||'', m.usuario_nombre||'', m.notas||''
+  ]));
+  downloadCSV(rows, `kardex_${pname.replace(/[^a-z0-9]/gi,'_')}_${new Date().toISOString().slice(0,10)}.csv`);
+  toast('Kardex exportado','success');
+}
+
+// ── Módulo de Ajustes de Inventario ──────────────────────────────────────
+async function showAjustesModule(){
+  openModal('📋 Ajustes de Inventario',`
+    <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:13px;color:var(--text2)">Conteos físicos y correcciones de stock</div>
+      <button class="btn btn-primary btn-sm" onclick="newAjuste()">+ Nuevo ajuste</button>
+    </div>
+    <div id="ajustesList" style="min-height:80px">
+      <div style="text-align:center;padding:16px;color:var(--text3)">Cargando...</div>
+    </div>`,
+    `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>`
+  );
+  setTimeout(loadAjustesList, 50);
+}
+
+async function loadAjustesList(){
+  const el = document.getElementById('ajustesList');
+  if(!el) return;
+  const r = await sb(`/rest/v1/ajustes_inventario?negocio_id=eq.${S.user.nid}&order=created_at.desc&limit=30`);
+  const items = r.data||[];
+  if(!items.length){
+    el.innerHTML='<div class="empty-state"><div class="icon">📋</div><p>Sin ajustes registrados</p></div>';
+    return;
+  }
+  const stColor={borrador:'var(--yellow)',confirmado:'var(--green)',anulado:'var(--red)'};
+  el.innerHTML=items.map(a=>`
+    <div class="data-item" style="cursor:pointer" onclick="openAjuste('${a.id}')">
+      <div class="d-icon" style="background:var(--surface)">📋</div>
+      <div class="d-info">
+        <div class="d-title">${esc(a.nombre)}</div>
+        <div class="d-sub">${fmtD(a.fecha)} · ${esc(a.usuario_nombre||'')}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;font-weight:700;color:${stColor[a.estado]||'var(--text2)'}">
+          ${a.estado.toUpperCase()}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+async function newAjuste(){
+  const nombre = `Conteo ${new Date().toLocaleDateString('es-CL')}`;
+  showLoad();
+  const r = await sb('/rest/v1/ajustes_inventario',{method:'POST',body:JSON.stringify({
+    negocio_id: S.user.nid,
+    nombre,
+    estado: 'borrador',
+    fecha: new Date().toISOString().slice(0,10),
+    usuario_id: S.user.id,
+    usuario_nombre: S.user.name
+  })});
+  hideLoad();
+  if(r.ok) openAjuste(r.data[0].id);
+  else toast('Error al crear ajuste','error');
+}
+
+async function openAjuste(ajId){
+  showLoad();
+  const [ajR, linR] = await Promise.all([
+    sb(`/rest/v1/ajustes_inventario?id=eq.${ajId}`),
+    sb(`/rest/v1/ajuste_lineas?ajuste_id=eq.${ajId}&select=*,productos(nombre)`)
+  ]);
+  hideLoad();
+  const aj = ajR.data?.[0]; if(!aj) return;
+  const lines = linR.data||[];
+  const isDraft = aj.estado==='borrador';
+
+  openModal(`📋 ${esc(aj.nombre)}`,`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div>
+        <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:100px;background:var(--surface);color:${aj.estado==='confirmado'?'var(--green)':aj.estado==='anulado'?'var(--red)':'var(--yellow)'}">
+          ${aj.estado.toUpperCase()}
+        </span>
+        <span style="font-size:12px;color:var(--text3);margin-left:8px">${fmtD(aj.fecha)}</span>
+      </div>
+      ${isDraft?`<button class="btn btn-outline btn-sm" onclick="addAjusteLine('${ajId}')">+ Agregar producto</button>`:''}
+    </div>
+    ${!lines.length?`<div class="empty-state"><div class="icon">📦</div><p>Sin líneas aún.<br><small>Agrega productos para contar.</small></p></div>`:`
+    <div style="border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:12px">
+      <div style="display:grid;grid-template-columns:1fr 80px 80px 70px 100px;gap:0;background:var(--surface);padding:8px 10px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">
+        <div>Producto</div><div style="text-align:right">Sistema</div><div style="text-align:right">Contado</div><div style="text-align:right">Dif.</div><div style="text-align:center">Motivo</div>
+      </div>
+      ${lines.map(l=>`
+        <div style="display:grid;grid-template-columns:1fr 80px 80px 70px 100px;gap:0;padding:9px 10px;border-top:1px solid var(--border);font-size:12px;align-items:center">
+          <div style="font-weight:600">${esc(l.productos?.nombre||'')}</div>
+          <div style="text-align:right;font-family:var(--mono)">${l.stock_sistema}</div>
+          <div style="text-align:right">
+            ${isDraft
+              ? `<input type="number" value="${l.stock_contado}" min="0" step="0.01"
+                   onchange="updateAjusteLine('${l.id}',this.value)"
+                   style="width:70px;padding:4px;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-size:12px;text-align:right;outline:none">`
+              : `<span style="font-family:var(--mono)">${l.stock_contado}</span>`}
+          </div>
+          <div style="text-align:right;font-family:var(--mono);font-weight:700;color:${l.diferencia>0?'var(--green)':l.diferencia<0?'var(--red)':'var(--text3)'}">
+            ${l.diferencia>0?'+':''}${l.diferencia}
+          </div>
+          <div style="text-align:center;font-size:10px;color:var(--text3)">${esc(l.motivo||'conteo')}</div>
+        </div>`).join('')}
+    </div>`}
+    ${aj.notas?`<div style="font-size:12px;color:var(--text2);padding:8px;background:var(--surface);border-radius:var(--r)">📝 ${esc(aj.notas)}</div>`:''}`,
+    `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>
+     ${isDraft&&lines.length?`<button class="btn btn-primary" onclick="confirmarAjuste('${ajId}')">✅ Confirmar ajuste</button>`:''}
+     ${isDraft?`<button class="btn btn-danger btn-sm" onclick="anularAjuste('${ajId}')">Anular</button>`:''}`
+  );
+}
+
+async function addAjusteLine(ajId){
+  // Add all products with current stock
+  const prods = S.products.filter(p=>p.stock>=0);
+  if(!prods.length){toast('Sin productos en inventario','warn');return;}
+
+  openModal('Agregar producto al conteo',`
+    <div style="max-height:300px;overflow-y:auto">
+      ${prods.map(p=>`
+        <div class="data-item" style="cursor:pointer" onclick="insertAjusteLine('${ajId}','${p.id}',${p.stock})">
+          <div class="d-icon" style="background:var(--surface)">📦</div>
+          <div class="d-info">
+            <div class="d-title">${esc(p.name)}</div>
+            <div class="d-sub">Stock actual: ${p.stock}</div>
+          </div>
+          <div style="color:var(--accent2);font-weight:700">+</div>
+        </div>`).join('')}
+    </div>`,
+    `<button class="btn btn-outline" onclick="closeModal()">Cancelar</button>`
+  );
+}
+
+async function insertAjusteLine(ajId, prodId, stockSistema){
+  showLoad();
+  await sb('/rest/v1/ajuste_lineas',{method:'POST',body:JSON.stringify({
+    ajuste_id: ajId,
+    negocio_id: S.user.nid,
+    producto_id: prodId,
+    stock_sistema: stockSistema,
+    stock_contado: stockSistema, // default = igual al sistema
+    motivo: 'conteo'
+  })});
+  hideLoad();
+  toast('Producto agregado','success');
+  openAjuste(ajId);
+}
+
+async function updateAjusteLine(lineId, newCount){
+  await sb(`/rest/v1/ajuste_lineas?id=eq.${lineId}`,{
+    method:'PATCH',
+    body:JSON.stringify({stock_contado: parseFloat(newCount)||0})
+  });
+}
+
+async function confirmarAjuste(ajId){
+  if(!confirm('¿Confirmar ajuste? Se actualizará el stock de todos los productos con diferencias.')) return;
+  showLoad();
+  try{
+    // Load lines with differences
+    const r = await sb(`/rest/v1/ajuste_lineas?ajuste_id=eq.${ajId}&negocio_id=eq.${S.user.nid}&select=*,productos(nombre,stock)`);
+    const lines = (r.data||[]).filter(l=>l.diferencia!==0);
+
+    for(const l of lines){
+      const stockActual = l.productos?.stock ?? l.stock_sistema;
+      const nuevoStock = l.stock_contado;
+      const diff = l.diferencia;
+
+      // Update stock
+      await sb(`/rest/v1/productos?id=eq.${l.producto_id}`,{
+        method:'PATCH',
+        body:JSON.stringify({stock: nuevoStock})
+      });
+
+      // Register movement
+      await registrarMovimiento({
+        productoId: l.producto_id,
+        cantidad: diff,
+        tipo: diff>0 ? 'ajuste_positivo' : 'ajuste_negativo',
+        refId: ajId,
+        refTipo: 'ajuste',
+        notas: `Ajuste inventario — Contado: ${l.stock_contado}, Sistema: ${l.stock_sistema}`,
+        stockAntes: stockActual
+      });
+    }
+
+    // Mark as confirmed
+    await sb(`/rest/v1/ajustes_inventario?id=eq.${ajId}`,{
+      method:'PATCH',
+      body:JSON.stringify({estado:'confirmado'})
+    });
+
+    toast(`✓ Ajuste confirmado — ${lines.length} producto(s) actualizados`,'success');
+    await loadProds();
+    closeModal();
+  }catch(e){
+    toast('Error al confirmar: '+e.message,'error');
+  }finally{
+    hideLoad();
+  }
+}
+
+async function anularAjuste(ajId){
+  if(!confirm('¿Anular este ajuste? No se aplicarán cambios.')) return;
+  showLoad();
+  await sb(`/rest/v1/ajustes_inventario?id=eq.${ajId}`,{method:'PATCH',body:JSON.stringify({estado:'anulado'})});
+  hideLoad();
+  toast('Ajuste anulado','warn');
+  closeModal();
+}
+
+// ── Dashboard operacional de stock ────────────────────────────────────────
+async function showStockDashboard(){
+  openModal('⚡ Dashboard Operacional',`
+    <div id="opDashContent" style="min-height:200px">
+      <div style="text-align:center;padding:20px;color:var(--text3)">Cargando...</div>
+    </div>`,
+    `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>
+     <button class="btn btn-outline btn-sm" onclick="showAjustesModule();closeModal()">📋 Ajustes</button>
+     <button class="btn btn-primary btn-sm" onclick="newAjuste();closeModal()">+ Conteo</button>`
+  );
+  setTimeout(loadOpDash, 50);
+}
+
+async function loadOpDash(){
+  const el = document.getElementById('opDashContent');
+  if(!el) return;
+  const nid = S.user.nid;
+  const [movR, prodR, reorderR] = await Promise.all([
+    sb(`/rest/v1/stock_movements?negocio_id=eq.${nid}&order=created_at.desc&limit=20`),
+    sb(`/rest/v1/productos?negocio_id=eq.${nid}&activo=eq.true&select=id,nombre,stock,stock_min`),
+    sb(`/rest/v1/reorder_rules?negocio_id=eq.${nid}&activa=eq.true`)
+  ]);
+
+  const movs = movR.data||[];
+  const prods = prodR.data||[];
+  const rules = reorderR.data||[];
+
+  // Products needing reorder
+  const sinStock = prods.filter(p=>parseInt(p.stock)<=0);
+  const stockBajo = prods.filter(p=>parseInt(p.stock)>0&&parseInt(p.stock)<=parseInt(p.stock_min||5));
+
+  // Reorder suggestions from rules
+  const sugerencias = rules.map(r=>{
+    const p=prods.find(p=>p.id===r.producto_id);
+    if(!p) return null;
+    const deficit=parseFloat(r.stock_minimo)-parseFloat(p.stock);
+    return deficit>0?{nombre:p.nombre,stock:p.stock,min:r.stock_minimo,reponer:r.cantidad_reponer}:null;
+  }).filter(Boolean);
+
+  el.innerHTML=`
+    <!-- KPIs -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+      <div style="background:${sinStock.length?'var(--red-bg)':'var(--surface)'};border:1px solid ${sinStock.length?'var(--red-border)':'var(--border)'};border-radius:var(--r);padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">SIN STOCK</div>
+        <div style="font-size:24px;font-weight:800;color:${sinStock.length?'var(--red)':'var(--text)'}">${sinStock.length}</div>
+      </div>
+      <div style="background:${stockBajo.length?'var(--ybg)':'var(--surface)'};border:1px solid ${stockBajo.length?'var(--yel-border)':'var(--border)'};border-radius:var(--r);padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">STOCK BAJO</div>
+        <div style="font-size:24px;font-weight:800;color:${stockBajo.length?'var(--yellow)':'var(--text)'}">${stockBajo.length}</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">MOVIMIENTOS HOY</div>
+        <div style="font-size:24px;font-weight:800">${movs.filter(m=>m.created_at?.slice(0,10)===new Date().toISOString().slice(0,10)).length}</div>
+      </div>
+    </div>
+
+    <!-- Alertas críticas -->
+    ${sinStock.length||stockBajo.length?`
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">⚠️ Requieren atención</div>
+      ${[...sinStock.map(p=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--red-bg);border-radius:var(--r);margin-bottom:4px">
+          <span style="font-size:13px;font-weight:600">${esc(p.nombre)}</span>
+          <span style="font-size:11px;font-weight:800;color:var(--red)">❌ Sin stock</span>
+        </div>`),
+        ...stockBajo.map(p=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--ybg);border-radius:var(--r);margin-bottom:4px">
+          <span style="font-size:13px;font-weight:600">${esc(p.nombre)}</span>
+          <span style="font-size:11px;font-weight:800;color:var(--yellow)">⚠ ${p.stock} uds</span>
+        </div>`)].join('')}
+    </div>`:'<div style="color:var(--green);text-align:center;padding:10px;font-size:13px;margin-bottom:12px">✅ Todo el stock en orden</div>'}
+
+    <!-- Últimos movimientos -->
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Últimos movimientos</div>
+    ${!movs.length?'<div class="empty-state" style="padding:12px"><p>Sin movimientos registrados aún</p></div>':
+    `<div style="border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+      ${movs.slice(0,8).map(m=>{
+        const colors={compra:'var(--green)',venta:'var(--red)',ajuste_positivo:'var(--green)',ajuste_negativo:'var(--red)',devolucion:'var(--yellow)',merma:'var(--red)'};
+        const icons={compra:'📥',venta:'📤',ajuste_positivo:'⬆️',ajuste_negativo:'⬇️',devolucion:'↩️',merma:'🗑'};
+        const prod=S.products.find(p=>p.id===m.producto_id);
+        return`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px">
+          <span>${icons[m.tipo]||'📋'}</span>
+          <div style="flex:1">
+            <div style="font-weight:600">${esc(prod?.name||m.producto_id?.slice(-6)||'')}</div>
+            <div style="font-size:10px;color:var(--text3)">${fmtDT(m.created_at)} · ${esc(m.usuario_nombre||'')}</div>
+          </div>
+          <div style="font-family:var(--mono);font-weight:700;color:${colors[m.tipo]||'var(--text)'}">
+            ${m.cantidad>0?'+':''}${m.cantidad}
+          </div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text3);min-width:30px;text-align:right">${m.stock_despues}</div>
+        </div>`;
+      }).join('')}
+    </div>`}`;
 }
 
 // Globals for inline onclick
