@@ -3783,7 +3783,10 @@ document.addEventListener('DOMContentLoaded',async ()=>{
       addToCart(pc.dataset.pid);return;
     }
     // Inventory actions
-    const ia=e.target.closest('.inv-actions [data-a]');if(ia){const id=ia.dataset.id,n=ia.dataset.n,a=ia.dataset.a;if(a==='edit'){const p=S.products.find(p=>p.id===id);showProdForm(p);}if(a==='del')delProd(id,n);if(a==='priceHist')showPriceHistory(id,ia.dataset.pn||n||'');if(a==='dup')duplicateProd(id);return;}
+    const ia=e.target.closest('.inv-actions [data-a]');if(ia){const id=ia.dataset.id,n=ia.dataset.n,a=ia.dataset.a;if(a==='edit'){const p=S.products.find(p=>p.id===id);showProdForm(p);}if(a==='del')delProd(id,n);if(a==='priceHist')showPriceHistory(id,ia.dataset.pn||n||'');
+      if(a==='kardex')showKardex(id,ia.dataset.pn||n||'');
+      if(a==='dup')duplicateProd(id);
+      return;}
     // Data actions
     const da=e.target.closest('[data-a]');if(da){
       const a=da.dataset.a;
@@ -6213,8 +6216,9 @@ function renderInvList(){
         <div style="font-weight:700;font-family:var(--mono)">${fmt(p.price)}</div>
         <div class="inv-stk ${sc}" style="font-size:11px">${sl}</div>
       </div>
-      <div style="display:flex;gap:4px;flex-shrink:0">
+      <div class="inv-actions" style="display:flex;gap:4px;flex-shrink:0">
         <button class="btn btn-outline btn-sm" data-id="${p.id}" data-a="edit">✏️</button>
+        <button class="btn btn-ghost btn-sm" data-id="${p.id}" data-pn="${esc(p.name)}" data-a="kardex" title="Kardex">📊</button>
         <button class="btn btn-outline btn-sm" data-id="${p.id}" data-a="dup">⧉</button>
         <button class="btn btn-danger btn-sm" data-id="${p.id}" data-n="${esc(p.name)}" data-a="del">🗑</button>
       </div>
@@ -6606,8 +6610,8 @@ async function showKardex(pid, pname){
     `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>
      <button class="btn btn-outline btn-sm" onclick="exportKardex('${pid}','${esc(pname)}')">📤 CSV</button>`
   );
-  // Load async after modal opens
-  setTimeout(()=>loadKardex(pid), 50);
+  // Load async after modal renders
+  setTimeout(()=>loadKardex(pid), 120);
 }
 
 async function loadKardex(pid){
