@@ -2320,7 +2320,9 @@ function updateCart(){
 }
 
 function renderPayGrid(){
-  const methods=(S.cfg.methods||'efectivo,transferencia,tarjeta').split(',');
+  // Always include fiado - it's a core feature, not optional
+  const configured=(S.cfg.methods||'efectivo,transferencia,tarjeta').split(',');
+  const methods=[...new Set([...configured,'fiado'])]; // ensure fiado always present
   const icons={efectivo:'💵',transferencia:'📱',tarjeta:'💳',fiado:'📒'};
   const labels={efectivo:'Efectivo',transferencia:'Transfer.',tarjeta:'Tarjeta',fiado:'Fiado'};
   $('payGrid').innerHTML=methods.map(m=>`<button class="pay-btn${m===S.payMethod?' active':''}" data-m="${m}"><span class="pi">${icons[m]||'💳'}</span>${labels[m]||m}</button>`).join('');
