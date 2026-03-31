@@ -2226,9 +2226,13 @@ function renderProdGrid(q=''){
   const grid=$('prodGrid');
   if(!prods.length){grid.innerHTML='<div class="empty-state" style="grid-column:span 2"><div class="icon">📦</div><p>Sin productos</p></div>';return;}
   grid.innerHTML=prods.map(p=>{
-    const ic=S.cart.find(i=>i.id===p.id);
-    const sc=p.stock===0?'sout':p.stock<=p.minStock?'slow':'sok';
-    const sl=p.stock===0?'❌ Agotado':p.stock<=p.minStock?'⚠ '+p.stock:'✓ '+p.stock;
+    const ic=S.cart.find(i=>i.id===p.id||i._key?.startsWith(p.id+'__'));
+    // For variant products, show variant count not parent stock
+    let hasVars=false;let varCount=0;
+    if(p.variants){try{const vv=typeof p.variants==='string'?JSON.parse(p.variants):p.variants;
+      if(Array.isArray(vv)&&vv.length){hasVars=true;vv.forEach(g=>(g.values||[]).forEach(v=>{if(typeof v==='object'&&v.stock>0)varCount+=parseInt(v.stock)||0;}));}}catch{}}
+    const sc=hasVars?(varCount===0?'sout':'sok'):(p.stock===0?'sout':p.stock<=p.minStock?'slow':'sok');
+    const sl=hasVars?(varCount===0?'❌ Sin stock':'🏷 '+varCount+' disp.'):(p.stock===0?'❌ Agotado':p.stock<=p.minStock?'⚠ '+p.stock:'✓ '+p.stock);
     return`<div class="prod-card" data-pid="${p.id}">${ic?`<div class="prod-badge">${ic.qty}x</div>`:''}<div class="prod-img" ${p.gallery&&p.gallery.length>1?`onclick="event.stopPropagation();cycleProdImg(this,'${p.id}')"`:''}>${p.img?`<img src="${esc(p.img)}" loading="lazy">`:'📦'}${p.gallery&&p.gallery.length>1?`<div class="prod-img-dots">${p.gallery.slice(0,4).map((_,i)=>`<div class="prod-img-dot${i===0?' active':''}"></div>`).join('')}</div>`:''}</div><div class="prod-body"><div class="prod-name">${esc(p.name)}</div><div class="prod-price">${fmt(p.price)}</div>${p.unit!=='unidad'?`<div class="prod-unit">/${p.unit}</div>`:''}<div class="prod-stock ${sc}">${sl}</div></div>${p.unit!=='unidad'?`<button class="prod-add prod-add-unit" data-pid="${p.id}" data-unit="${p.unit}" data-price="${p.price}" title="Agregar cantidad">+</button>`:`<button class="prod-add" data-pid="${p.id}">+</button>`}</div>`;
   }).join('');
   // Event delegation for + buttons
@@ -2238,9 +2242,19 @@ function renderProdGrid(q=''){
 
 function addToCart(pid){
   const p=S.products.find(p=>p.id===pid);if(!p)return;
+  // REGLA: producto con variantes NUNCA se agrega directamente
+  if(p.variants){
+    let v=p.variants;try{if(typeof v==='string')v=JSON.parse(v);}catch{}
+    if(Array.isArray(v)&&v.length){
+      showVariantPicker(p,(prod,varLabel,varStock)=>{addToCartWithVariant(prod,varLabel,varStock);});
+      return;
+    }
+  }
+  // Producto simple: validar stock propio
   if(p.stock<=0){toast('Sin stock','warn');return;}
   const idx=S.cart.findIndex(i=>i.id===pid);
-  if(idx>=0)S.cart[idx].qty++;else S.cart.push({id:p.id,name:p.name,price:p.price,origPrice:p.price,cost:p.cost,qty:1,unit:p.unit,disc:0});
+  if(idx>=0)S.cart[idx].qty++;
+  else S.cart.push({id:p.id,name:p.name,price:p.price,origPrice:p.price,cost:p.cost,qty:1,unit:p.unit,disc:0});
   updateCart();renderProdGrid($('salesSearch').value);
 }
 
@@ -2354,22 +2368,43 @@ async function doCheckout(){
       await sb('/rest/v1/detalle_ventas',{method:'POST',body:JSON.stringify({venta_id:saleId,negocio_id:S.user.nid,producto_id:item.id,nombre:item.name,cantidad:item.qty,precio_venta:item.effectivePrice||item.price,precio_costo:item.cost||0,subtotal:(item.effectivePrice||item.price)*item.qty,descuento_item:item.disc||0})});
       const pr=await sb(`/rest/v1/productos?id=eq.${item.id}&select=stock,variantes`);
       if(pr.data&&pr.data[0]){
-        const newStock=Math.max(0,(parseInt(pr.data[0].stock)||0)-item.qty);
-        const patchData={stock:newStock};
-        // Also update variant stock if applicable
+        const patchData={};
         if(item.variant&&pr.data[0].variantes){
+          // PRODUCTO CON VARIANTE: solo descuenta stock de la variante, NO del producto madre
           try{
             const vars=typeof pr.data[0].variantes==='string'?JSON.parse(pr.data[0].variantes):pr.data[0].variantes;
             let updated=false;
+            // Match variant by label parts (handles "Color: Rojo / Talla: M" format)
+            const labelParts=item.variant.split(' / ').map(s=>s.trim());
             vars.forEach(g=>g.values.forEach(v=>{
-              if((v.name||v)===item.variant||(typeof item.variant==='string'&&item.variant.includes(v.name||v))){
-                v.stock=Math.max(0,(parseInt(v.stock)||0)-item.qty);updated=true;
+              const vname=typeof v==='string'?v:(v.name||'');
+              if(labelParts.some(part=>part===vname||part.endsWith(': '+vname))){
+                if(v.stock!=null){
+                  v.stock=Math.max(0,(parseInt(v.stock)||0)-item.qty);
+                  updated=true;
+                }
               }
             }));
-            if(updated)patchData.variantes=JSON.stringify(vars);
-          }catch(e){}
+            if(updated){
+              patchData.variantes=JSON.stringify(vars);
+              // Recalculate parent stock as sum of variant stocks
+              let totalVarStock=0;
+              vars.forEach(g=>g.values.forEach(v=>{
+                if(typeof v==='object'&&v.stock!=null)totalVarStock+=parseInt(v.stock)||0;
+              }));
+              patchData.stock=totalVarStock;
+            }
+          }catch(e){console.warn('Variant stock update error:',e);}
+        } else {
+          // PRODUCTO SIMPLE: descuenta stock directo
+          patchData.stock=Math.max(0,(parseInt(pr.data[0].stock)||0)-item.qty);
         }
-        await sb(`/rest/v1/productos?id=eq.${item.id}`,{method:'PATCH',body:JSON.stringify(patchData)});
+        if(Object.keys(patchData).length){
+          const stockAntes=pr.data[0].stock;
+          await sb(`/rest/v1/productos?id=eq.${item.id}`,{method:'PATCH',body:JSON.stringify(patchData)});
+          registrarMovimiento({productoId:item.id,cantidad:-item.qty,tipo:'venta',refId:saleId,refTipo:'venta',
+            notas:item.variant?`${item.name} [${item.variant}]`:esc(item.name),stockAntes});
+        }
       }
     }
     if(S.payMethod==='fiado'&&clientId){
@@ -3795,11 +3830,7 @@ document.addEventListener('DOMContentLoaded',async ()=>{
         const p=S.products.find(p=>p.id===pa.dataset.pid);
         if(p)showUnitQtyPicker(p);
       } else {
-        const p=S.products.find(p=>p.id===pa.dataset.pid);
-        if(p&&p.variants){
-          let v=p.variants;try{if(typeof v==='string')v=JSON.parse(v);}catch{}
-          if(Array.isArray(v)&&v.length){showVariantPicker(p,(prod,varLabel)=>{addToCartWithVariant(prod,varLabel);});return;}
-        }
+        // addToCart handles variant redirect internally — no double logic here
         addToCart(pa.dataset.pid);
       }
       return;
@@ -3809,8 +3840,7 @@ document.addEventListener('DOMContentLoaded',async ()=>{
     if(pc&&!e.target.closest('.prod-add')&&!e.target.closest('[data-pid]')){
       const p=S.products.find(p=>p.id===pc.dataset.pid);
       if(p&&p.unit!=='unidad'){showUnitQtyPicker(p);return;}
-      // Card click: always go to variant picker if has variants
-      if(p&&p.variants){let v=p.variants;try{if(typeof v==='string')v=JSON.parse(v);}catch{}if(Array.isArray(v)&&v.length){showVariantPicker(p,(prod,varLabel)=>{addToCartWithVariant(prod,varLabel);});return;}}
+      // addToCart already handles variant redirect internally - single point of truth
       addToCart(pc.dataset.pid);return;
     }
     // Inventory actions
@@ -4116,7 +4146,18 @@ function showVariantPicker(p,onSelect){
     const allSel=variants.every(g=>selected[g.name]);
     if(!allSel){toast('Selecciona todas las opciones','warn');return;}
     const label=Object.values(selected).join(' / ');
-    closeModal();onSelect(p,label);
+    // Calculate variant stock (minimum across selected values)
+    let varStock=-1;
+    variants.forEach(g=>{
+      const selVal=selected[g.name];
+      const valObj=(g.values||[]).find(v=>(v.name||v)===selVal);
+      if(valObj&&typeof valObj==='object'&&valObj.stock!=null){
+        const vs=parseInt(valObj.stock);
+        if(varStock===-1||vs<varStock)varStock=vs;
+      }
+    });
+    if(varStock===0){toast('Sin stock para esta variante','warn');return;}
+    closeModal();onSelect(p,label,varStock);
   });
 }
 window.varPickSel=function(group,value){
@@ -4130,17 +4171,26 @@ window.varPickSel=function(group,value){
 };
 
 
-function addToCartWithVariant(p,varLabel,varGroupIdx,varValueIdx){
-  const displayName=varLabel?`${p.name} (${varLabel})`:p.name;
+function addToCartWithVariant(p,varLabel,varStock){
+  const displayName=varLabel?`${p.name} — ${varLabel}`:p.name;
   const key=varLabel?`${p.id}__${varLabel}`:p.id;
+  // Validate variant stock
+  if(varStock===0){toast('Sin stock para esta variante','warn');return;}
   const existing=S.cart.findIndex(i=>i._key===key);
-  if(existing>=0)S.cart[existing].qty++;
-  else S.cart.push({
-    id:p.id,_key:key,name:displayName,
-    price:p.price,cost:p.cost,qty:1,
-    unit:p.unit||'unidad',variant:varLabel,
-    varGroupIdx,varValueIdx
-  });
+  if(existing>=0){
+    // Check stock before incrementing
+    if(varStock>0&&S.cart[existing].qty>=varStock){
+      toast(`Stock máximo: ${varStock} unidades`,'warn');return;
+    }
+    S.cart[existing].qty++;
+  } else {
+    S.cart.push({
+      id:p.id,_key:key,name:displayName,
+      price:p.price,origPrice:p.price,cost:p.cost,qty:1,
+      unit:p.unit||'unidad',variant:varLabel,disc:0,
+      _varStock:varStock  // store for checkout validation
+    });
+  }
   updateCart();renderProdGrid($('salesSearch').value);
 }
 // ═══════════════════════════════════════════════════
