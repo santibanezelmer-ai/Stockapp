@@ -1821,12 +1821,52 @@ async function hashPass(pass){
   }catch{return pass;} // fallback si crypto no disponible
 }
 
-async function sb(path,opts={}){
+// ── Supabase proxy client ───────────────────────────────────────────────────
+// _directSb: always goes direct to Supabase (for login, OTP, audit — pre-auth)
+async function _directSb(path, opts={}){
   const headers={'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK,'Prefer':'return=representation',...(opts.headers||{})};
   const res=await fetch(SB+path,{...opts,headers});
   const txt=await res.text();
   try{return{ok:res.ok,status:res.status,data:JSON.parse(txt)};}
   catch{return{ok:res.ok,status:res.status,data:txt};}
+}
+
+// Routes through Worker (/sb/*) when user is logged in.
+// Worker validates session + sets negocio context before each query.
+// Falls back to direct Supabase for public operations (login, OTP).
+
+function _getSessionToken(){
+  try{
+    const u=JSON.parse(sessionStorage.getItem('ox_user')||'{}');
+    return u._token||'';
+  }catch{return '';}
+}
+
+async function sb(path, opts={}){
+  // Route through proxy if logged in and path is data (not auth)
+  const user = S.user;
+  const token = _getSessionToken();
+  if(user?.nid && token && !path.includes('/usuarios?login=') && !path.includes('/negocios?')){
+    // Use Worker proxy — adds negocio context
+    const headers = {
+      'Content-Type':     'application/json',
+      'Prefer':           'return=representation',
+      'X-Session-Token':  token,
+      'X-Negocio-ID':     user.nid,
+      ...(opts.headers||{})
+    };
+    try{
+      const res  = await fetch('/sb'+path, {...opts, headers});
+      const txt  = await res.text();
+      try{return {ok:res.ok, status:res.status, data:JSON.parse(txt)};}
+      catch{return {ok:res.ok, status:res.status, data:txt};}
+    }catch(e){
+      // Fallback to direct on network error
+      console.warn('[sb] proxy error, falling back:', e.message);
+    }
+  }
+  // Direct Supabase — for login, OTP, and pre-auth calls
+  return _directSb(path, opts);
 }
 
 // AUTH
@@ -1847,18 +1887,9 @@ async function doLogin(){
 
   showLoad();
   try{
-    // Try hashed first, then plaintext (for accounts created before hash migration)
+    // Solo hash SHA-256 — plaintext eliminado por seguridad
     const _ph=await hashPass(p);
-    let r=await _realSb(`/rest/v1/usuarios?login=eq.${encodeURIComponent(u)}&password=eq.${encodeURIComponent(_ph)}&activo=eq.true`);
-    // Fallback: try plaintext for pre-hash accounts
-    if(!r.ok||!r.data.length){
-      r=await _realSb(`/rest/v1/usuarios?login=eq.${encodeURIComponent(u)}&password=eq.${encodeURIComponent(p)}&activo=eq.true`);
-      // If plaintext login works, upgrade the password to hash
-      if(r.ok&&r.data.length){
-        const _uid=r.data[0].id;
-        _realSb(`/rest/v1/usuarios?id=eq.${_uid}`,{method:'PATCH',body:JSON.stringify({password:_ph})});
-      }
-    }
+    const r=await _realSb(`/rest/v1/usuarios?login=eq.${encodeURIComponent(u)}&password=eq.${encodeURIComponent(_ph)}&activo=eq.true`);
     if(!r.ok||!r.data.length){
       lockData.attempts=(lockData.attempts||0)+1;
       if(lockData.attempts>=10){lockData.lockedUntil=Date.now()+5*60*1000;lockData.lockedAt=Date.now();lockData.attempts=0;}
@@ -1872,9 +1903,16 @@ async function doLogin(){
     const nr=await _realSb(`/rest/v1/negocios?id=eq.${usr.negocio_id}&select=nombre,plan,slug`);
     const neg=nr.data&&nr.data[0];
     if(neg&&neg.plan==='blocked'){showAErr('loginErr','Cuenta suspendida. Contacta soporte.');hideLoad();return;}
-    S.user={id:usr.id,name:usr.nombre,login:usr.login,role:usr.rol,nid:usr.negocio_id,perms:usr.permisos||{},bizName:neg?neg.nombre:''};
+    // Generate session token (random, used by Worker proxy to validate)
+    const _tok = Array.from(crypto.getRandomValues(new Uint8Array(24)))
+      .map(b=>b.toString(16).padStart(2,'0')).join('');
+    S.user={id:usr.id,name:usr.nombre,login:usr.login,role:usr.rol,nid:usr.negocio_id,
+      perms:usr.permisos||{},bizName:neg?neg.nombre:'',
+      loginAt:Date.now(),expiresAt:Date.now()+8*60*60*1000,
+      _token:_tok}; // session token for proxy auth
     sessionStorage.setItem('ox_user',JSON.stringify(S.user));
-    setTimeout(()=>{try{registerSession();}catch(e){}},300);
+    // Register session in DB for proxy validation
+    setTimeout(()=>registerSession(_tok),300);
     hideLoad();
 
     // Redirect to subdomain if slug exists, otherwise start app here
@@ -2017,6 +2055,15 @@ function doLogout(){
   const siteFooter=document.querySelector('footer.site-footer');
   if(siteFooter)siteFooter.style.display='';
   if(!confirm('¿Cerrar sesión?'))return;
+  // Revoke session in DB
+  const _logoutToken=_getSessionToken();
+  if(_logoutToken){
+    _directSb(`/rest/v1/sessions?token=eq.${encodeURIComponent(_logoutToken)}`,{
+      method:'PATCH',
+      headers:{'Prefer':'return=minimal'},
+      body:JSON.stringify({activa:false,revoked_at:new Date().toISOString(),motivo_revocacion:'logout'})
+    }).catch(()=>{});
+  }
   S.user=null;
   sessionStorage.removeItem('ox_user');
   $('appScreen').classList.add('hidden');
@@ -2044,6 +2091,17 @@ async function startApp(){
   if(!S.user?.nid){
     console.error('[OperixERP] startApp sin nid - volviendo al login');
     return;
+  }
+  // Check session expiration
+  if(S.user.expiresAt && Date.now() > S.user.expiresAt){
+    sessionStorage.removeItem('ox_user');
+    toast('Sesión expirada. Inicia sesión nuevamente.','warn',3000);
+    return;
+  }
+  // Refresh expiry on active use
+  if(S.user.expiresAt){
+    S.user.expiresAt = Date.now() + 8*60*60*1000;
+    sessionStorage.setItem('ox_user', JSON.stringify(S.user));
   }
   // Quick session validation: verify login still matches DB
   try{
@@ -2095,6 +2153,7 @@ async function startApp(){
   // Audit section added lazily when settings opens
   // FASE 4: keyboard shortcuts
   initKeyboardShortcuts();
+  initInactivityTimer();
 }
 
 // NAV
@@ -2595,8 +2654,8 @@ function showProdForm(p=null){
       <div class="form-group"><label>Proveedor</label><input type="text" id="pS" value="${esc(p?.supplier||'')}"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label for="pCo">Precio Costo</label><input type="number" id="pCo" value="${p?.cost||''}" min="0" step="0.01"></div>
-      <div class="form-group"><label for="pP">Precio Venta *</label><input type="number" id="pP" value="${p?.price||''}" min="0" step="0.01"></div>
+      ${canDo('ver_costos')?`<div class="form-group"><label for="pCo">Precio Costo</label><input type="number" id="pCo" value="${p?.cost||''}" min="0" step="0.01"></div>`:'<input type="hidden" id="pCo" value="${p?.cost||0}">'}
+      <div class="form-group"><label for="pP">Precio Venta *</label><input type="number" id="pP" value="${p?.price||''}" min="0" step="0.01" ${canDo('editar_precios')?'':'readonly style="opacity:0.5"'}></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label for="pSt">Stock</label><input type="number" id="pSt" value="${p?.stock||0}" min="0"></div>
@@ -2682,7 +2741,7 @@ async function saveProd(id){
     stock:$('pSt').value!==''?parseInt($('pSt').value):0,
     stock_min:parseInt($('pMs').value)||5,
     codigo:$('pBc').value.trim()||'',
-    imagen_url:$('pIm').value.trim()||'',
+    imagen_url:sanitizeImageUrl($('pIm').value)||'',
   };
   // Optional fields - only include if column likely exists
   const optData={};
@@ -2702,7 +2761,10 @@ async function saveProd(id){
   const r=id
     ?await sb(`/rest/v1/productos?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({...data,updated_at:new Date().toISOString()})})
     :await sb('/rest/v1/productos',{method:'POST',body:JSON.stringify(postData)});
-  if(r.ok&&id&&oldPrice!==null)savePriceToHistory(id,data.precio_venta,oldPrice,data.precio_costo);
+  if(r.ok&&id&&oldPrice!==null){
+    savePriceToHistory(id,data.precio_venta,oldPrice,data.precio_costo);
+    auditLog('precio_cambiado',{precio_nuevo:data.precio_venta,precio_anterior:oldPrice},'producto',id,{precio:oldPrice});
+  }
   hideLoad();
   if(r.ok){toast(id?'Actualizado':'Creado','success');closeModal();await loadProds();loadInv();}
   else toast('Error','error');
@@ -2712,7 +2774,7 @@ async function delProd(id,name){
   if(!confirm(`¿Eliminar "${name}"?`))return;
   showLoad();
   await sb(`/rest/v1/productos?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({activo:false})});
-  auditLog('producto_eliminado',{nombre:name,id});
+  auditLog('producto_eliminado',{nombre:name},'producto',id,{nombre:name});
   hideLoad();toast('Eliminado','success');await loadProds();loadInv();
 }
 
@@ -3930,7 +3992,7 @@ async function saveUser(){
   const _hp=await hashPass(pass);
   const r=await sb('/rest/v1/usuarios',{method:'POST',body:JSON.stringify({negocio_id:S.user.nid,nombre:name,login,password:_hp,rol:role})});
   hideLoad();
-  if(r.ok){toast('Usuario creado','success');closeModal();loadUsersList();}else toast('Error','error');
+  if(r.ok){auditLog('usuario_creado',{login,rol:role},'usuario');toast('Usuario creado','success');closeModal();loadUsersList();}else toast('Error','error');
 }
 
 async function delUser(login){
@@ -4773,7 +4835,7 @@ async function sbOffline(path,opts={}){
 }
 
 // Make sb offline-aware by wrapping after definition
-const _realSb = sb;
+const _realSb = _directSb;
 // Redefine sb to be offline-aware (no recursion since we captured _realSb)
 // eslint-disable-next-line no-func-assign
 sb = async function(path, opts={}) {
@@ -7266,6 +7328,7 @@ async function confirmarAjuste(ajId){
       body:JSON.stringify({estado:'confirmado'})
     });
 
+    auditLog('ajuste_inventario_confirmado',{productos_afectados:lines.length},'ajuste',ajId);
     toast(`✓ Ajuste confirmado — ${lines.length} producto(s) actualizados`,'success');
     await loadProds();
     closeModal();
@@ -7595,6 +7658,127 @@ async function saveQuickClient(){
     opt.selected = true;
     sel.appendChild(opt);
     onFiadoClientChange(sel);
+  }
+}
+
+function auditLog(action, data={}, entidad=null, entidadId=null, antesData=null){
+  if(!S.user)return;
+  _realSb('/rest/v1/audit_logs',{method:'POST',body:JSON.stringify({
+    negocio_id:   S.user.nid,
+    usuario_id:   S.user.id,
+    usuario_nombre: S.user.name||S.user.login,
+    accion:       action,
+    entidad:      entidad,
+    entidad_id:   entidadId||null,
+    datos_antes:  antesData?JSON.stringify(antesData):null,
+    datos_despues:Object.keys(data).length?JSON.stringify(data):null
+  })}).catch(()=>{});
+}
+
+// ═══════════════════════════════════════════════════
+// SEGURIDAD — Inactividad, permisos, sanitización
+// ═══════════════════════════════════════════════════
+
+// ── Inactividad: cierra sesión después de 30 min sin actividad ────────────
+let _inactivityTimer;
+function initInactivityTimer(){
+  const TIMEOUT = 30 * 60 * 1000; // 30 minutos
+  const reset = () => {
+    clearTimeout(_inactivityTimer);
+    _inactivityTimer = setTimeout(()=>{
+      if(S.user){
+        toast('Sesión cerrada por inactividad','warn',4000);
+        setTimeout(doLogout, 2000);
+      }
+    }, TIMEOUT);
+  };
+  ['mousemove','keypress','click','touchstart','scroll'].forEach(ev=>{
+    document.addEventListener(ev, reset, {passive:true});
+  });
+  reset();
+}
+
+// ── Control de acceso por rol ─────────────────────────────────────────────
+function canDo(action){
+  if(!S.user) return false;
+  const role = S.user.role;
+  const perms = S.user.perms || {};
+  // Admin puede todo
+  if(role==='admin') return true;
+  // Permisos específicos por acción
+  const map = {
+    ver_costos:     perms.ver_costos,
+    ver_config:     perms.ver_config,
+    ver_reportes:   perms.ver_reportes,
+    anular_ventas:  perms.anular_ventas,
+    hacer_descuentos: perms.hacer_descuentos,
+    agregar_productos: perms.agregar_productos,
+    editar_precios:   role==='admin'||perms.ver_costos,
+  };
+  return !!map[action];
+}
+
+// ── Sanitizar input para prevenir XSS ────────────────────────────────────
+function sanitizeInput(str, maxLen=500){
+  if(typeof str !== 'string') return '';
+  return str.trim().slice(0, maxLen)
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#x27;')
+    .replace(/\//g,'&#x2F;');
+}
+
+// ── Validar URL de imagen (evitar JS injection) ───────────────────────────
+function sanitizeImageUrl(url){
+  if(!url||typeof url!=='string') return '';
+  const trimmed = url.trim();
+  // Only allow http/https
+  if(!trimmed.match(/^https?:\/\//i)) return '';
+  // Block JS protocol and data URIs
+  if(trimmed.match(/javascript:|data:/i)) return '';
+  // Max length
+  if(trimmed.length > 2048) return '';
+  return trimmed;
+}
+
+// ── Rate limit helper (en memoria, complementa localStorage) ─────────────
+const _rlMap = new Map();
+function checkRateLimit(key, maxAttempts=5, windowMs=300000){
+  const now = Date.now();
+  const entry = _rlMap.get(key) || {attempts:0, resetAt: now+windowMs};
+  if(now > entry.resetAt){
+    entry.attempts = 0;
+    entry.resetAt = now + windowMs;
+  }
+  entry.attempts++;
+  _rlMap.set(key, entry);
+  return entry.attempts > maxAttempts;
+}
+
+// ── Mostrar sección con control de acceso ─────────────────────────────────
+// Wrap showSec to check permissions for sensitive sections
+const _origShowSec = typeof showSec === 'function' ? showSec : null;
+
+async function registerSession(token){
+  if(!S.user?.nid||!token)return;
+  try{
+    await _directSb('/rest/v1/sessions',{
+      method:'POST',
+      headers:{'Prefer':'return=minimal'},
+      body:JSON.stringify({
+        negocio_id:   S.user.nid,
+        usuario_id:   S.user.id,
+        usuario_login:S.user.login,
+        token:        token,
+        expires_at:   new Date(S.user.expiresAt).toISOString(),
+        activa:       true,
+        last_active:  new Date().toISOString()
+      })
+    });
+    console.log('[Auth] Session registered in DB');
+  }catch(e){
+    console.warn('[Auth] Session registration failed (non-critical):',e.message);
   }
 }
 
