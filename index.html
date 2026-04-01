@@ -1480,10 +1480,35 @@ body.tablet-mode .prod-name{
 
       <!-- ORDERS -->
       <section class="section" id="sec-orders">
-        <div class="sec-hd"><h2>Pedidos WhatsApp</h2></div>
-        <div class="stats-grid" style="grid-template-columns:1fr 1fr">
-          <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value blue" id="ordCount">0</div></div>
-          <div class="stat-card"><div class="stat-label">Valor</div><div class="stat-value green" id="ordTotal">$0</div></div>
+        <div class="sec-hd">
+          <h2>Pedidos WhatsApp</h2>
+        </div>
+        <div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">
+          <div class="stat-card" style="cursor:pointer" onclick="filterOrders('')">
+            <div class="stat-label">Total</div>
+            <div class="stat-value blue" id="ordCount">0</div>
+          </div>
+          <div class="stat-card" style="cursor:pointer;border-color:var(--accent)" onclick="filterOrders('nuevo')">
+            <div class="stat-label">🔔 Nuevos</div>
+            <div class="stat-value accent" id="ordNew">0</div>
+          </div>
+          <div class="stat-card" style="cursor:pointer" onclick="filterOrders('confirmado')">
+            <div class="stat-label">✅ Confirmados</div>
+            <div class="stat-value green" id="ordConfirmed">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">💰 Valor</div>
+            <div class="stat-value green" id="ordTotal">$0</div>
+          </div>
+        </div>
+        <!-- Filtro estado -->
+        <div class="filters" style="margin-bottom:10px">
+          <button class="fpill active" data-ofilter="">Todos</button>
+          <button class="fpill" data-ofilter="nuevo">🔔 Nuevos</button>
+          <button class="fpill" data-ofilter="visto">👁 Vistos</button>
+          <button class="fpill" data-ofilter="confirmado">✅ Confirmados</button>
+          <button class="fpill" data-ofilter="rechazado">❌ Rechazados</button>
+          <button class="fpill" data-ofilter="completado">🏁 Completados</button>
         </div>
         <div id="ordersList" class="data-list"></div>
       </section>
@@ -3390,15 +3415,228 @@ async function savePayable(){
 async function payPayable(id){if(!confirm('¿Marcar como pagada?'))return;showLoad();await sb(`/rest/v1/cuentas_pagar?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({estado:'pagada'})});hideLoad();toast('Pagada','success');loadPayables();}
 
 // ORDERS
-function loadOrders(){
-  const orders=getOrders();
-  $('ordCount').textContent=orders.length;$('ordTotal').textContent=fmt(orders.reduce((s,o)=>s+(o.total||0),0));
-  const el=$('ordersList');
-  if(!orders.length){el.innerHTML='<div class="empty-state"><div class="icon">📲</div><p>Sin pedidos</p></div>';return;}
-  el.innerHTML=orders.map(o=>`<div class="data-item"><div class="d-icon" style="background:var(--bbg)">📲</div><div class="d-info"><div class="d-title">${esc(o.clientName||'Sin nombre')}</div><div class="d-sub">${esc(o.savedAt||'')} · ${(o.items||[]).length} items</div></div><div class="d-right"><div class="d-amount green">${fmt(o.total)}</div></div></div>`).join('');
+// ─── Pedidos WhatsApp ─────────────────────────────────────────────────────
+let _ordersFilter = '';
+let _allOrders = [];
+
+async function loadOrders(){
+  if(!S.user) return;
+  const r = await sb(`/rest/v1/pedidos_whatsapp?negocio_id=eq.${S.user.nid}&order=created_at.desc&limit=100`);
+  if(!r.ok){
+    // Table might not exist yet
+    $('ordersList').innerHTML='<div class="empty-state"><div class="icon">📲</div><p>Ejecuta el SQL de pedidos_whatsapp en Supabase.</p></div>';
+    return;
+  }
+  _allOrders = r.data||[];
+  const nuevo = _allOrders.filter(o=>o.estado==='nuevo').length;
+  const conf  = _allOrders.filter(o=>o.estado==='confirmado').length;
+  const total = _allOrders.reduce((s,o)=>s+parseFloat(o.total||0),0);
+  $('ordCount').textContent    = _allOrders.length;
+  $('ordNew').textContent      = nuevo;
+  $('ordConfirmed').textContent= conf;
+  $('ordTotal').textContent    = fmt(total);
+  renderOrdersList();
+  // Mark nuevos as vistos after 3s (gives time to see the badge)
+  const newIds = _allOrders.filter(o=>o.estado==='nuevo').map(o=>o.id);
+  if(newIds.length){
+    setTimeout(async()=>{
+      for(const id of newIds){
+        await sb(`/rest/v1/pedidos_whatsapp?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({estado:'visto'})});
+        const o=_allOrders.find(o=>o.id===id);
+        if(o) o.estado='visto';
+      }
+      $('ordNew').textContent='0';
+      renderOrdersList(); // refresh list to show updated badges
+    }, 3000);
+  }
 }
+
+function filterOrders(estado){
+  _ordersFilter=estado;
+  // Update pills
+  document.querySelectorAll('[data-ofilter]').forEach(b=>{
+    b.classList.toggle('active',b.dataset.ofilter===estado);
+  });
+  renderOrdersList();
+}
+
+function renderOrdersList(){
+  const el=$('ordersList');
+  const orders=_ordersFilter?_allOrders.filter(o=>o.estado===_ordersFilter):_allOrders;
+  if(!orders.length){
+    el.innerHTML='<div class="empty-state"><div class="icon">📲</div><p>Sin pedidos'+(_ordersFilter?' con estado "'+_ordersFilter+'"':'')+'</p></div>';
+    return;
+  }
+  const stColors={nuevo:'var(--accent)',visto:'var(--text3)',confirmado:'var(--green)',rechazado:'var(--red)',completado:'var(--text2)'};
+  const stLabels={nuevo:'🔔 Nuevo',visto:'👁 Visto',confirmado:'✅ Confirmado',rechazado:'❌ Rechazado',completado:'🏁 Completado'};
+  el.innerHTML=orders.map(o=>`
+    <div class="data-item" style="cursor:pointer;align-items:flex-start" onclick="showOrderDetail('${o.id}')">
+      <div class="d-icon" style="background:var(--bbg);flex-shrink:0">📲</div>
+      <div class="d-info" style="flex:1">
+        <div class="d-title" style="display:flex;align-items:center;gap:6px">
+          ${esc(o.cliente_nombre||'Sin nombre')}
+          <span style="font-size:10px;font-weight:700;color:${stColors[o.estado]||'var(--text3)'};
+            padding:2px 7px;border-radius:100px;background:${stColors[o.estado]||'var(--text3)'}18">
+            ${stLabels[o.estado]||o.estado}
+          </span>
+        </div>
+        <div class="d-sub">
+          ${fmtDT(o.created_at)}
+          ${o.cliente_telefono?` · 📞 ${esc(o.cliente_telefono)}`:''}
+          · ${(o.items||[]).length} productos
+        </div>
+        ${o.cliente_notas?`<div style="font-size:11px;color:var(--text3);margin-top:2px">📝 ${esc(o.cliente_notas)}</div>`:''}
+      </div>
+      <div class="d-right" style="flex-shrink:0">
+        <div class="d-amount green">${fmt(o.total)}</div>
+      </div>
+    </div>`).join('');
+}
+
+async function showOrderDetail(id){
+  const o = _allOrders.find(o=>o.id===id);
+  if(!o) return;
+  const items = Array.isArray(o.items)?o.items:(typeof o.items==='string'?JSON.parse(o.items):[]);
+  const stColors={nuevo:'var(--accent)',visto:'var(--text3)',confirmado:'var(--green)',rechazado:'var(--red)',completado:'var(--text2)'};
+  const stLabels={nuevo:'🔔 Nuevo',visto:'👁 Visto',confirmado:'✅ Confirmado',rechazado:'❌ Rechazado',completado:'🏁 Completado'};
+
+  openModal(`📲 Pedido — ${esc(o.cliente_nombre)}`,`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+      <div style="background:var(--surface);border-radius:var(--r);padding:10px">
+        <div style="font-size:10px;color:var(--text3)">CLIENTE</div>
+        <div style="font-weight:700">${esc(o.cliente_nombre)}</div>
+        ${o.cliente_telefono?`<div style="font-size:12px;color:var(--text2)">${esc(o.cliente_telefono)}</div>`:''}
+      </div>
+      <div style="background:var(--surface);border-radius:var(--r);padding:10px">
+        <div style="font-size:10px;color:var(--text3)">FECHA</div>
+        <div style="font-weight:700">${fmtDT(o.created_at)}</div>
+        <div style="font-size:11px;font-weight:700;color:${stColors[o.estado]}">${stLabels[o.estado]||o.estado}</div>
+      </div>
+    </div>
+    ${o.cliente_notas?`<div style="background:var(--ybg);border-radius:var(--r);padding:8px 12px;margin-bottom:10px;font-size:12px">📝 ${esc(o.cliente_notas)}</div>`:''}
+    <!-- Productos -->
+    <div style="border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:10px">
+      <div style="background:var(--surface);padding:8px 12px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;display:grid;grid-template-columns:1fr 50px 80px">
+        <div>Producto</div><div style="text-align:right">Cant.</div><div style="text-align:right">Subtotal</div>
+      </div>
+      ${items.map(i=>`
+        <div style="display:grid;grid-template-columns:1fr 50px 80px;padding:9px 12px;border-top:1px solid var(--border);font-size:13px;align-items:center">
+          <div style="font-weight:600">${esc(i.name||i.nombre||'')}</div>
+          <div style="text-align:right;color:var(--text2)">${i.qty||i.cantidad||1}</div>
+          <div style="text-align:right;font-family:var(--mono);font-weight:700">${fmt((i.price||i.precio||0)*(i.qty||i.cantidad||1))}</div>
+        </div>`).join('')}
+      <div style="display:grid;grid-template-columns:1fr 80px;padding:10px 12px;border-top:2px solid var(--border2);background:var(--surface)">
+        <div style="font-weight:800">TOTAL</div>
+        <div style="text-align:right;font-family:var(--mono);font-weight:800;font-size:16px;color:var(--accent2)">${fmt(o.total)}</div>
+      </div>
+    </div>
+    <!-- Cambiar estado -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      ${['confirmado','rechazado','completado'].filter(s=>s!==o.estado).map(s=>`
+        <button class="btn btn-outline btn-sm" onclick="updateOrderStatus('${o.id}','${s}')">
+          ${stLabels[s]}
+        </button>`).join('')}
+      ${o.cliente_telefono?`
+        <button class="btn btn-success btn-sm" onclick="window.open('https://wa.me/${o.cliente_telefono.replace(/[^0-9]/g,'')}','_blank')">
+          📲 WhatsApp
+        </button>`:''}
+    </div>
+    <!-- Convertir a venta -->
+    ${o.estado!=='completado'&&o.estado!=='rechazado'?`
+    <div style="background:var(--gbg);border-radius:var(--r);padding:10px;font-size:12px;color:var(--green)">
+      <strong>¿Listo para cobrar?</strong> — Convierte este pedido en una venta del POS
+    </div>`:''}`,
+  `<button class="btn btn-outline" onclick="closeModal()">Cerrar</button>
+   ${o.estado!=='completado'&&o.estado!=='rechazado'?`<button class="btn btn-primary" onclick="convertOrderToSale('${o.id}')">💳 Cobrar pedido</button>`:''}`);
+}
+
+async function updateOrderStatus(id, estado){
+  await sb(`/rest/v1/pedidos_whatsapp?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({estado})});
+  const o=_allOrders.find(o=>o.id===id);
+  if(o) o.estado=estado;
+  toast('Estado actualizado','success');
+  closeModal();
+  renderOrdersList();
+}
+
+async function convertOrderToSale(id){
+  const o=_allOrders.find(o=>o.id===id);
+  if(!o)return;
+  const items=Array.isArray(o.items)?o.items:(typeof o.items==='string'?JSON.parse(o.items):[]);
+  closeModal();
+  showSec('sales');
+  // Load products and populate cart
+  await loadProds();
+  S.cart=[];
+  items.forEach(i=>{
+    const pid=i.id||i.producto_id;
+    const iname=(i.name||i.nombre||'').toLowerCase();
+    // Try match by id first, then by name
+    const p=S.products.find(p=>p.id===pid) ||
+            S.products.find(p=>p.name.toLowerCase()===iname);
+    if(p){
+      S.cart.push({id:p.id,name:p.name,price:i.price||p.price,origPrice:i.price||p.price,
+        cost:p.cost,qty:parseInt(i.qty||i.cantidad||1),unit:p.unit,disc:0});
+    } else {
+      // Product not in inventory — add as manual line with catalog price
+      S.cart.push({id:'ext_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+        name:i.name||i.nombre||'Producto',
+        price:i.price||i.precio||0,origPrice:i.price||i.precio||0,
+        cost:0,qty:parseInt(i.qty||i.cantidad||1),unit:'unidad',disc:0});
+    }
+  });
+  // Pre-fill client if exists
+  const c=S.clients.find(c=>c.phone===o.cliente_telefono||c.name===o.cliente_nombre);
+  if(c){
+    setTimeout(()=>{
+      const sc=$('saleClient');if(sc)sc.value=c.id;
+    },500);
+  }
+  await loadProds();
+  updateCart();
+  renderProdGrid();
+  renderPayGrid();
+  // Mark as completado after converting
+  await updateOrderStatus(id,'completado');
+  toast(`✓ Pedido de ${o.cliente_nombre} cargado al carrito`,'success',3000);
+}
+
+// Legacy: save order from catalog (now saves to Supabase via API)
+async function saveOrderToSupabase(orderData){
+  // Called from catalog page — uses negocio_id from URL
+  const nid = new URLSearchParams(window.location.search).get('nid') ||
+               localStorage.getItem('ox_cat_nid');
+  if(!nid) return;
+  try{
+    await fetch('https://ebekmlhdrxtloghftbga.supabase.co/rest/v1/pedidos_whatsapp',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImViZWttbGhkcnh0bG9naGZ0YmdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3MDc2MjYsImV4cCI6MjA4OTI4MzYyNn0.4T9tYw4neBd6-LYnVV9hLhBUVMqfhQomuqGuf_jHyos',
+        'Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImViZWttbGhkcnh0bG9naGZ0YmdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3MDc2MjYsImV4cCI6MjA4OTI4MzYyNn0.4T9tYw4neBd6-LYnVV9hLhBUVMqfhQomuqGuf_jHyos',
+        'Prefer':'return=minimal'
+      },
+      body:JSON.stringify({
+        negocio_id: nid,
+        cliente_nombre: orderData.clientName,
+        cliente_telefono: orderData.clientPhone,
+        cliente_notas: orderData.notes||'',
+        items: JSON.stringify(orderData.items),
+        total: orderData.total,
+        estado: 'nuevo'
+      })
+    });
+  }catch(e){console.warn('Order save error:',e);}
+}
+
+// Keep getOrders/saveOrder for backward compat
 function getOrders(){try{return JSON.parse(localStorage.getItem('ox_orders')||'[]');}catch{return[];}}
-function saveOrder(o){const ords=getOrders();ords.unshift(o);localStorage.setItem('ox_orders',JSON.stringify(ords.slice(0,100)));}
+function saveOrder(o){
+  // Save to localStorage for backward compat
+  const ords=getOrders();ords.unshift(o);localStorage.setItem('ox_orders',JSON.stringify(ords.slice(0,100)));
+  // Also save to Supabase
+  saveOrderToSupabase(o);
+}
 
 // ACCOUNTING
 function accRange(p){const now=new Date();let from;if(p==='month')from=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10);else if(p==='quarter'){const q=Math.floor(now.getMonth()/3);from=new Date(now.getFullYear(),q*3,1).toISOString().slice(0,10);}else from=new Date(now.getFullYear(),0,1).toISOString().slice(0,10);return{from,to:now.toISOString().slice(0,10)};}
@@ -3668,7 +3906,7 @@ function sendOrder(){
   const url=sel?`https://wa.me/${sel.replace(/[^0-9]/g,'')}?text=${encodeURIComponent(lines.join('\n'))}`:
     `https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`;
   window.open(url,'_blank');
-  saveOrder({clientName:name,clientPhone:phone,items:S.catCart.map(i=>({name:i.name,qty:i.qty,price:i.price})),total:tot,savedAt:new Date().toLocaleString('es-CL')});
+  saveOrder({clientName:name,clientPhone:phone,notes:$('oNt')?.value.trim()||'',items:S.catCart.map(i=>({name:i.name,qty:i.qty,price:i.price})),total:tot,savedAt:new Date().toLocaleString('es-CL')});
   S.catCart=[];updateCatFAB();closeModal();toast('Pedido enviado','success');
 }
 
@@ -3807,6 +4045,10 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   $('dashRefreshBtn').addEventListener('click',loadDash);
 
   // Sales
+  // Orders filter pills
+  document.querySelectorAll('[data-ofilter]').forEach(b=>{
+    b.addEventListener('click',()=>filterOrders(b.dataset.ofilter));
+  });
   // Debounced search for better performance
   let _srchTimer;
   $('salesSearch').addEventListener('input',e=>{
