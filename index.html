@@ -4712,9 +4712,18 @@ function initPWA(){
 
   // Register service worker from /sw.js endpoint served by Worker
   if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('/sw.js',{scope:'/'}).then(reg=>{
-      console.log('SW registered');
-    }).catch(e=>console.log('SW not available:',e.message));
+    // Clear all caches first to fix stale 404s
+    if('caches' in window){
+      caches.keys().then(keys=>keys.forEach(k=>caches.delete(k)));
+    }
+    // Unregister old SWs then register fresh
+    navigator.serviceWorker.getRegistrations().then(regs=>{
+      Promise.all(regs.map(r=>r.unregister())).then(()=>{
+        navigator.serviceWorker.register('/sw.js',{scope:'/'}).then(reg=>{
+          console.log('[SW] registered');
+        }).catch(e=>console.warn('[SW] register failed',e));
+      });
+    });
   }
 
   // Install prompt
