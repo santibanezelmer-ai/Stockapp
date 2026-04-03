@@ -2912,11 +2912,25 @@ async function loadDebts(){
     sb(`/rest/v1/deudas?negocio_id=eq.${nid}&tipo=eq.deuda&order=created_at.desc&select=*,clientes(nombre,telefono)`),
   ]);
   const withDebt=(cR.data||[]).map(mapC),fiadoL=fR.data||[],manL=mR.data||[];
+  // Set of cliente IDs that still have debt
+  const debtClientIds=new Set(withDebt.map(c=>c.id));
   $('debtTotal').textContent=fmt(withDebt.reduce((s,c)=>s+c.debt,0));
-  $('debtCount').textContent=withDebt.length;$('debtFiado').textContent=fiadoL.length;$('debtManual').textContent=manL.filter(d=>!d.venta_id).length;
+  $('debtCount').textContent=withDebt.length;
+  // Only count fiado/manual items from clients who still have debt
+  $('debtFiado').textContent=fiadoL.filter(v=>debtClientIds.has(v.cliente_id)).length;
+  $('debtManual').textContent=manL.filter(d=>!d.venta_id&&debtClientIds.has(d.cliente_id)).length;
   let items=[];
-  if(S.debtsFilter==='all'||S.debtsFilter==='fiado')fiadoL.forEach(v=>{const c=withDebt.find(c=>c.id===v.cliente_id);items.push({type:'fiado',name:c?c.name:'Sin cliente',phone:c?c.phone:'',cid:v.cliente_id,amt:parseFloat(v.total||0),date:fmtDT(v.created_at),totalDebt:c?c.debt:0});});
-  if(S.debtsFilter==='all'||S.debtsFilter==='manual')manL.forEach(d=>{items.push({type:'manual',name:d.clientes?d.clientes.nombre:'Sin cliente',phone:d.clientes?d.clientes.telefono:'',cid:d.cliente_id,amt:parseFloat(d.monto||0),date:fmtDT(d.created_at),notes:d.notas||''});});
+  // FIX: only show fiado ventas where the client still has deuda_total > 0
+  if(S.debtsFilter==='all'||S.debtsFilter==='fiado')fiadoL.forEach(v=>{
+    const c=withDebt.find(c=>c.id===v.cliente_id);
+    if(!c)return; // skip — client has no remaining debt
+    items.push({type:'fiado',name:c.name,phone:c.phone,cid:v.cliente_id,amt:parseFloat(v.total||0),date:fmtDT(v.created_at),totalDebt:c.debt});
+  });
+  // FIX: only show manual debts where client still has deuda_total > 0
+  if(S.debtsFilter==='all'||S.debtsFilter==='manual')manL.forEach(d=>{
+    if(!debtClientIds.has(d.cliente_id))return; // skip — already paid
+    items.push({type:'manual',name:d.clientes?d.clientes.nombre:'Sin cliente',phone:d.clientes?d.clientes.telefono:'',cid:d.cliente_id,amt:parseFloat(d.monto||0),date:fmtDT(d.created_at),notes:d.notas||''});
+  });
   items.sort((a,b)=>b.amt-a.amt);
   const el=$('debtsList');
   if(!items.length){el.innerHTML='<div class="empty-state"><div class="icon">✅</div><p>Sin cobros pendientes</p></div>';return;}
