@@ -2879,10 +2879,20 @@ async function payDebt(cid){
 async function doPayDebt(cid){
   const amt=parseFloat($('pdA').value)||0;if(!amt){toast('Ingresa monto','warn');return;}
   const c=S.clients.find(c=>c.id===cid);
+  const notas=$('pdN').value.trim()||'Cobro deuda';
   showLoad();
-  await sb('/rest/v1/deudas',{method:'POST',body:JSON.stringify({negocio_id:S.user.nid,cliente_id:cid,monto:amt,tipo:'pago',notas:$('pdN').value.trim()})});
+  // 1. Registrar pago en tabla deudas
+  await sb('/rest/v1/deudas',{method:'POST',body:JSON.stringify({negocio_id:S.user.nid,cliente_id:cid,monto:amt,tipo:'pago',notas})});
+  // 2. Actualizar deuda_total del cliente
   await sb(`/rest/v1/clientes?id=eq.${cid}`,{method:'PATCH',body:JSON.stringify({deuda_total:Math.max(0,(c?.debt||0)-amt)})});
-  hideLoad();toast('Registrado','success');closeModal();await loadClients();renderClients();loadDebts();
+  // 3. Registrar ingreso en flujo_caja para que sume al total de caja
+  await sb('/rest/v1/flujo_caja',{method:'POST',body:JSON.stringify({negocio_id:S.user.nid,tipo:'ingreso',monto:amt,descripcion:`Cobro deuda — ${c?.name||'cliente'}${notas?': '+notas:''}`,usuario_id:S.user.id})});
+  hideLoad();toast('Cobro registrado','success');closeModal();
+  // 4. Refrescar cobros, clientes Y caja
+  await loadClients();
+  renderClients();
+  await loadDebts();
+  loadCF();
 }
 
 async function showHist(cid,cname){
